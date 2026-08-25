@@ -170,8 +170,7 @@ const N = [
     n: 'Revivir Pokémon',
     c: 'Revivir',
     p: 10,
-    soloUsoUnico: true, 
-    d: 'Trae de vuelta a la vida a un Pokémon muerto escribiendo su nombre. Solo se puede usar una vez por partida; si intentas usarlo de nuevo, el sistema no te dejará (Abrir ticket para comprobación).',
+   d: 'Trae de vuelta a la vida a un Pokémon muerto escribiendo su nombre. Solo se puede usar una vez por partida; si intentas usarlo de nuevo, el sistema no te dejará (Abrir ticket para comprobación).',
   },
   {
     n: 'Totem',
