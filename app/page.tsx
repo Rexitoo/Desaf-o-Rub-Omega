@@ -170,7 +170,7 @@ const N = [
     n: 'Revivir Pokémon',
     c: 'Revivir',
     p: 10,
-   d: 'Trae de vuelta a la vida a un Pokémon muerto escribiendo su nombre. Solo se puede usar una vez por partida; si intentas usarlo de nuevo, el sistema no te dejará (Abrir ticket para comprobación).',
+    d: 'Trae de vuelta a la vida a un Pokémon muerto escribiendo su nombre. Solo se puede usar una vez por Pokémon (Abrir ticket para comprobación).',
   },
   {
     n: 'Totem',
@@ -204,7 +204,7 @@ const N = [
     c: 'Revivir',
     p: 0,
     soloRuleta: true,
-    d: 'Bloquea un ataque y recibe el comodín usado en tu contra, debes usarlo obligatoriamente contra la persona que te has atacado. Solo disponible en ruleta de tramo (Abrir ticket para dar dicho comodín de rebote)',
+    d: 'Usa este comodín para activar un Escudo protector automático. Si te atacan, el ataque rebota, se devuelve al atacante y recibes la carta que usaron en tu contra.',
   },
 
   // ECONOMÍA
@@ -361,7 +361,7 @@ const CARTAS = N.map((x, i) => ({
 }));
 
 /* =========================================================
-   PARTICIPANTES (ACTUALIZADO CON TODOS LOS NUEVOS JUGADORES)
+   PARTICIPANTES
 ========================================================= */
 
 const PT_INICIAL = [
@@ -679,6 +679,42 @@ export default function DesafioPokemonApp() {
       return;
     }
 
+    // LÓGICA DE REVERSA: Al usar Reversa, te otorga automáticamente un Escudo Protector
+    if (nombreCarta.toLowerCase() === 'reversa') {
+      const cartaEncontrada = comprasActuales.find(
+        (c: string) => c.toLowerCase() === nombreCarta.toLowerCase()
+      );
+      if (!cartaEncontrada) {
+        mostrarNotificacion('❌ No tienes esta carta en el inventario.');
+        return;
+      }
+
+      const indexPropio = comprasActuales.findIndex(
+        (c: string) => c.toLowerCase() === nombreCarta.toLowerCase()
+      );
+      const nuevasComprasPropias = [...comprasActuales];
+      nuevasComprasPropias.splice(indexPropio, 1);
+      nuevasComprasPropias.push('Escudo protector'); // Coloca automáticamente el escudo protector
+
+      const actualizados = ps.map((x) => {
+        if (x.usuario === lg.usuario) {
+          return {
+            ...x,
+            compras: nuevasComprasPropias,
+          };
+        }
+        return x;
+      });
+
+      setPs(actualizados);
+      setLg(actualizados.find((x) => x.usuario === lg.usuario));
+      setCartaModal(null);
+      mostrarNotificacion('🔄 ¡Has activado la Reversa! Se ha añadido un Escudo protector en tu inventario a la espera de devolver el golpe.');
+      registrarHistorialAdmin(`Reversa activada: ${lg.usuario} usó Reversa y obtuvo un Escudo protector.`);
+      return;
+    }
+
+    // LÓGICA DE REVIVIR POKÉMON: Solo 1 uso por Pokémon específico
     if (nombreCarta.toLowerCase() === 'revivir pokémon') {
       const cartaEncontrada = comprasActuales.find(
         (c: string) => c.toLowerCase() === nombreCarta.toLowerCase()
@@ -687,14 +723,15 @@ export default function DesafioPokemonApp() {
         mostrarNotificacion('❌ No tienes esta carta en el inventario.');
         return;
       }
-      if (!revivirPokemonInput.trim()) {
+      const nombrePokemon = revivirPokemonInput.trim().toLowerCase();
+      if (!nombrePokemon) {
         mostrarNotificacion('⚠️ Debes escribir el nombre del Pokémon que deseas revivir.');
         return;
       }
 
       const revivirUsadosActuales = lg.revivirUsados || [];
-      if (revivirUsadosActuales.length > 0) {
-        mostrarNotificacion('❌ Ya has utilizado la carta de Revivir Pokémon. Esta carta solo se puede usar una vez; al escribirlo de nuevo no te va a dejar usar la carta.');
+      if (revivirUsadosActuales.map((p: string) => p.toLowerCase()).includes(nombrePokemon)) {
+        mostrarNotificacion(`❌ El Pokémon "${revivirPokemonInput.trim()}" ya ha utilizado su único revivir permitido.`);
         return;
       }
 
@@ -874,6 +911,7 @@ export default function DesafioPokemonApp() {
       const nuevasCompras = [...comprasActuales];
       nuevasCompras.splice(index, 1);
 
+      // SI TIENE ESCUDO PROTECTOR (REVERSA EXITOSA): Se devuelve el efecto y la carta al atacante
       if (tieneEscudoProtector) {
         const comprasObjetivoLimpias = [...(objetivoUser.compras || [])];
         const indexEscudo = comprasObjetivoLimpias.findIndex(
@@ -883,12 +921,19 @@ export default function DesafioPokemonApp() {
           comprasObjetivoLimpias.splice(indexEscudo, 1);
         }
 
+        const comprasAtacanteActualizadas = [...nuevasCompras, nombreCarta]; // Recibe de vuelta la carta que intentó tirar
+
+        let nuevoKarmaAtacanteTrasRebote = nuevoKarmaAtacante;
+        if (tipo === 'Fuerte' && nuevoKarmaAtacante > 0) {
+          nuevoKarmaAtacanteTrasRebote -= 1;
+        }
+
         const actualizados = ps.map((x) => {
           if (x.usuario === lg.usuario) {
             return {
               ...x,
-              karma: nuevoKarmaAtacante,
-              compras: nuevasCompras,
+              karma: nuevoKarmaAtacanteTrasRebote,
+              compras: comprasAtacanteActualizadas,
             };
           }
           if (x.usuario.toLowerCase() === objetivoUser.usuario.toLowerCase()) {
@@ -904,8 +949,8 @@ export default function DesafioPokemonApp() {
         setLg(actualizados.find((x) => x.usuario === lg.usuario));
         setAtaqueObjetivoUser('');
         setCartaModal(null);
-        mostrarNotificacion(`🛡️ ¡${objetivoUser.usuario} tenía un Escudo protector! El ataque fue bloqueado por completo y el escudo se ha consumido.`);
-        registrarHistorialAdmin(`Ataque bloqueado: ${nombreCarta} de ${lg.usuario} a ${objetivoUser.usuario} por Escudo protector`);
+        mostrarNotificacion(`🔄 ¡REVERSA! ${objetivoUser.usuario} tenía el escudo protector activo. El ataque se ha devuelto: ${lg.usuario} sufre el efecto y recibe la carta "${nombreCarta}" de vuelta en su inventario.`);
+        registrarHistorialAdmin(`Reversa devuelta: El ataque ${nombreCarta} de ${lg.usuario} rebotó en ${objetivoUser.usuario}`);
         return;
       }
 
@@ -1427,12 +1472,12 @@ export default function DesafioPokemonApp() {
                   <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
                     <div className="flex justify-between items-center mb-1">
                       <span className="text-xs font-bold text-yellow-400">
-                        🛡️ Actualización de Participantes
+                        🛡️ Actualización de Reversa y Revivir
                       </span>
                       <span className="text-[10px] text-slate-500">Hoy</span>
                     </div>
                     <p className="text-xs text-slate-300 leading-relaxed">
-                      Se han añadido todos los nuevos participantes al código general del desafío.
+                      Se han integrado las reglas de un único uso por Pokémon para Revivir y el rebote automático con obtención de carta para la Reversa.
                     </p>
                   </div>
                 </div>
@@ -1935,7 +1980,7 @@ export default function DesafioPokemonApp() {
                       className="w-full bg-slate-900 border border-slate-700 text-white p-2.5 rounded-lg text-xs outline-none focus:border-pink-500"
                     />
                     <p className="text-[10px] text-yellow-300 font-bold">
-                      ⚠️ Esta carta es de un solo uso. Si ya la usaste antes, el sistema no te permitirá utilizarla de nuevo.
+                      ⚠️ Cada Pokémon solo puede ser revivido una vez.
                     </p>
                   </div>
                 )}
