@@ -204,7 +204,7 @@ const N = [
     c: 'Revivir',
     p: 0,
     soloRuleta: true,
-    d: 'Usa este comodín para activar un escudo protector automático. Si te atacan, el ataque rebota, se devuelve al atacante y recibes la carta que usaron en tu contra.',
+    d: 'Usa este comodín para activar tu escudo protector. Si te atacan, el ataque rebota, se devuelve al atacante y te quedas con su carta de ataque.',
   },
 
   // ECONOMÍA
@@ -394,6 +394,8 @@ const PT_INICIAL = [
   contrasena: i === 0 ? 'tio123' : u.toLowerCase().replace('_', '') + '123',
   monedas: 20,
   compras: [],
+  escudoActivo: false, // Controla si tiene activado el escudo o reversa manualmente
+  reversaActiva: false, // Controla si la reversa está activada manualmente
   revivirUsados: [],
   ventaIlegalUsados: [],
   ventaIlegalLujoUsados: [],
@@ -549,6 +551,8 @@ export default function DesafioPokemonApp() {
       ...x,
       karma: 1,
       experiencia: 0,
+      escudoActivo: false,
+      reversaActiva: false,
       roboJustoCompradoTramo: false,
     }));
 
@@ -567,19 +571,9 @@ export default function DesafioPokemonApp() {
       return;
     }
 
-    const comprasActuales = objetivoUser.compras || [];
-    const tieneEscudoOReversa = comprasActuales.some((c: string) => c.toLowerCase() === 'escudo protector' || c.toLowerCase() === 'reversa');
-
-    if (!tieneEscudoOReversa) {
-      mostrarNotificacion(`⚠️ El usuario ${objetivoUser.usuario} no tiene ningún escudo protector ni reversa activa.`);
-      return;
-    }
-
-    const nuevasCompras = comprasActuales.filter((c: string) => c.toLowerCase() !== 'escudo protector' && c.toLowerCase() !== 'reversa');
-
     const actualizados = ps.map((x) => {
       if (x.usuario.toLowerCase() === objetivoUser.usuario.toLowerCase()) {
-        return { ...x, compras: nuevasCompras };
+        return { ...x, escudoActivo: false, reversaActiva: false };
       }
       return x;
     });
@@ -641,7 +635,7 @@ export default function DesafioPokemonApp() {
 
     setPs(actualizados);
     setLg(actualizados.find((x) => x.usuario === lg.usuario));
-    mostrarNotificacion(`Comprado con Éxito\nHas comprado ${carta.nombre} x1`);
+    mostrarNotificacion(`Comprado con Éxito\nHas comprado ${carta.nombre} x1 (Recuerda que debes darle a USAR para activarlo)`);
     registrarHistorialAdmin(`Compra: ${carta.nombre}`);
   };
 
@@ -679,9 +673,73 @@ export default function DesafioPokemonApp() {
       return;
     }
 
-    // LÓGICA DE REVERSA: Se queda en el inventario como escudo protector automático.
+    // ACTIVAR ESCUDO PROTECTOR MANUALMENTE
+    if (nombreCarta.toLowerCase() === 'escudo protector') {
+      const cartaEncontrada = comprasActuales.find(
+        (c: string) => c.toLowerCase() === nombreCarta.toLowerCase()
+      );
+      if (!cartaEncontrada) {
+        mostrarNotificacion('❌ No tienes esta carta en el inventario.');
+        return;
+      }
+      if (lg.escudoActivo) {
+        mostrarNotificacion('⚠️ Ya tienes un Escudo protector activo.');
+        return;
+      }
+
+      const index = comprasActuales.findIndex(
+        (c: string) => c.toLowerCase() === nombreCarta.toLowerCase()
+      );
+      const nuevasCompras = [...comprasActuales];
+      nuevasCompras.splice(index, 1);
+
+      const actualizados = ps.map((x) => {
+        if (x.usuario === lg.usuario) {
+          return { ...x, compras: nuevasCompras, escudoActivo: true };
+        }
+        return x;
+      });
+
+      setPs(actualizados);
+      setLg(actualizados.find((x) => x.usuario === lg.usuario));
+      setCartaModal(null);
+      mostrarNotificacion('🛡️ ¡Escudo protector activado con éxito! Se mantendrá activo hasta recibir un ataque.');
+      registrarHistorialAdmin(`Activación: ${lg.usuario} activó Escudo protector`);
+      return;
+    }
+
+    // ACTIVAR REVERSA MANUALMENTE
     if (nombreCarta.toLowerCase() === 'reversa') {
-      mostrarNotificacion('🔄 La Reversa funciona automáticamente como escudo protector en tu inventario. ¡Cuando te ataquen, rebotará de inmediato contra el atacante sin darte ningún escudo extra!');
+      const cartaEncontrada = comprasActuales.find(
+        (c: string) => c.toLowerCase() === nombreCarta.toLowerCase()
+      );
+      if (!cartaEncontrada) {
+        mostrarNotificacion('❌ No tienes esta carta en el inventario.');
+        return;
+      }
+      if (lg.reversaActiva) {
+        mostrarNotificacion('⚠️ Ya tienes la Reversa activa.');
+        return;
+      }
+
+      const index = comprasActuales.findIndex(
+        (c: string) => c.toLowerCase() === nombreCarta.toLowerCase()
+      );
+      const nuevasCompras = [...comprasActuales];
+      nuevasCompras.splice(index, 1);
+
+      const actualizados = ps.map((x) => {
+        if (x.usuario === lg.usuario) {
+          return { ...x, compras: nuevasCompras, reversaActiva: true };
+        }
+        return x;
+      });
+
+      setPs(actualizados);
+      setLg(actualizados.find((x) => x.usuario === lg.usuario));
+      setCartaModal(null);
+      mostrarNotificacion('🔄 ¡Reversa activada con éxito! Al recibir un ataque, rebotará, te quedarás con la carta del atacante y este se quedará sin ella.');
+      registrarHistorialAdmin(`Activación: ${lg.usuario} activó Reversa`);
       return;
     }
 
@@ -758,38 +816,48 @@ export default function DesafioPokemonApp() {
         return;
       }
 
-      // Comprobar si el objetivo tiene Escudo protector o Reversa
-      const comprasObjetivoCheck = objetivoUser.compras || [];
-      const tieneReversaObj = comprasObjetivoCheck.some((c: string) => c.toLowerCase() === 'reversa');
-      const tieneEscudoObj = comprasObjetivoCheck.some((c: string) => c.toLowerCase() === 'escudo protector');
-      const tieneProteccionObj = tieneReversaObj || tieneEscudoObj;
+      // El defensor SIEMPRE sube 1 nivel de experiencia al ser atacado (tenga o no escudos activos)
+      const expPrevioDef = objetivoUser.experiencia || 0;
+      const nuevaExpObjetivoBase = Math.min(4, expPrevioDef + 1);
 
-      if (tieneProteccionObj) {
-        const tipoProteccion = tieneReversaObj ? 'Reversa' : 'Escudo protector';
-        const indexProteccion = comprasObjetivoCheck.findIndex(
-          (c: string) => c.toLowerCase() === tipoProteccion.toLowerCase()
-        );
-        const comprasObjetivoLimpias = [...comprasObjetivoCheck];
-        if (indexProteccion !== -1) comprasObjetivoLimpias.splice(indexProteccion, 1);
-
+      // Comprobar si el objetivo tiene REVERSA activa
+      if (objetivoUser.reversaActiva) {
         const indexPropio = comprasActuales.findIndex(
           (c: string) => c.toLowerCase() === nombreCarta.toLowerCase()
         );
         const nuevasComprasPropias = [...comprasActuales];
-        nuevasComprasPropias.splice(indexPropio, 1);
-        nuevasComprasPropias.push(nombreCarta); // Recibe de vuelta su carta de ataque exacta
+        nuevasComprasPropias.splice(indexPropio, 1); // El atacante pierde su carta
+
+        // El defensor se queda con la carta con la que le atacaron
+        const comprasDefensorActualizadas = [...(objetivoUser.compras || []), nombreCarta];
 
         let karmaAtacante = lg.karma;
         if (karmaAtacante > 0) karmaAtacante -= 1; // El atacante pierde su karma
 
         const karmaObjetivo = (objetivoUser.karma || 0) + 1; // El defensor gana el karma
 
+        let regaloRoboJusto = false;
+        let comprasObjetivoFinal = [...comprasDefensorActualizadas];
+        if (expPrevioDef < 4 && nuevaExpObjetivoBase === 4 && !objetivoUser.roboJustoCompradoTramo) {
+          if (!comprasObjetivoFinal.includes('Robo Justo')) {
+            comprasObjetivoFinal.push('Robo Justo');
+            regaloRoboJusto = true;
+          }
+        }
+
         const actualizados = ps.map((x) => {
           if (x.usuario === lg.usuario) {
             return { ...x, karma: karmaAtacante, compras: nuevasComprasPropias };
           }
           if (x.usuario.toLowerCase() === objetivoUser.usuario.toLowerCase()) {
-            return { ...x, karma: karmaObjetivo, compras: comprasObjetivoLimpias };
+            return {
+              ...x,
+              karma: karmaObjetivo,
+              experiencia: nuevaExpObjetivoBase,
+              reversaActiva: false, // Se consume la reversa
+              compras: comprasObjetivoFinal,
+              roboJustoCompradoTramo: regaloRoboJusto ? true : x.roboJustoCompradoTramo,
+            };
           }
           return x;
         });
@@ -799,8 +867,56 @@ export default function DesafioPokemonApp() {
         setAtaqueObjetivoUser('');
         setComodinRobarSeleccionado('');
         setCartaModal(null);
-        mostrarNotificacion(`🔄 ¡${tipoProteccion} activado! El ataque rebotó: ${lg.usuario} pierde 1 de karma, recupera su carta "${nombreCarta}" y ${objetivoUser.usuario} gana el karma (sin generar cartas extra).`);
-        registrarHistorialAdmin(`Reversa/Escudo devuelto: ${nombreCarta} de ${lg.usuario} rebotó en ${objetivoUser.usuario}`);
+        mostrarNotificacion(`🔄 ¡Reversa activada! El ataque rebotó: ${lg.usuario} pierde su carta "${nombreCarta}" y se la queda ${objetivoUser.usuario}. A ${objetivoUser.usuario} le sube 1 nivel de experiencia.`);
+        registrarHistorialAdmin(`Reversa activada: ${nombreCarta} de ${lg.usuario} rebotó en ${objetivoUser.usuario}`);
+        return;
+      }
+
+      // Comprobar si el objetivo tiene ESCUDO PROTECTOR activo
+      if (objetivoUser.escudoActivo) {
+        const indexPropio = comprasActuales.findIndex(
+          (c: string) => c.toLowerCase() === nombreCarta.toLowerCase()
+        );
+        const nuevasComprasPropias = [...comprasActuales];
+        nuevasComprasPropias.splice(indexPropio, 1); // Se consume la carta del atacante
+
+        let karmaAtacante = lg.karma;
+        if (karmaAtacante > 0) karmaAtacante -= 1;
+        const karmaObjetivo = (objetivoUser.karma || 0) + 1;
+
+        let regaloRoboJusto = false;
+        let comprasObjetivoFinal = [...(objetivoUser.compras || [])];
+        if (expPrevioDef < 4 && nuevaExpObjetivoBase === 4 && !objetivoUser.roboJustoCompradoTramo) {
+          if (!comprasObjetivoFinal.includes('Robo Justo')) {
+            comprasObjetivoFinal.push('Robo Justo');
+            regaloRoboJusto = true;
+          }
+        }
+
+        const actualizados = ps.map((x) => {
+          if (x.usuario === lg.usuario) {
+            return { ...x, karma: karmaAtacante, compras: nuevasComprasPropias };
+          }
+          if (x.usuario.toLowerCase() === objetivoUser.usuario.toLowerCase()) {
+            return {
+              ...x,
+              karma: karmaObjetivo,
+              experiencia: nuevaExpObjetivoBase,
+              escudoActivo: false, // Se consume el escudo
+              compras: comprasObjetivoFinal,
+              roboJustoCompradoTramo: regaloRoboJusto ? true : x.roboJustoCompradoTramo,
+            };
+          }
+          return x;
+        });
+
+        setPs(actualizados);
+        setLg(actualizados.find((x) => x.usuario === lg.usuario));
+        setAtaqueObjetivoUser('');
+        setComodinRobarSeleccionado('');
+        setCartaModal(null);
+        mostrarNotificacion(`🛡️ ¡Escudo protector bloqueó el ataque! El ataque fue neutralizado. A ${objetivoUser.usuario} le sube 1 nivel de experiencia.`);
+        registrarHistorialAdmin(`Escudo protector activado por ${objetivoUser.usuario}`);
         return;
       }
 
@@ -831,14 +947,10 @@ export default function DesafioPokemonApp() {
       nuevoKarmaAtacante -= 1;
 
       const nuevoKarmaObjetivo = (objetivoUser.karma || 0) + 1;
-      const expPrevio = objetivoUser.experiencia || 0;
-      const nuevaExpObjetivo = Math.min(4, expPrevio + 1);
-
-      let comprasObjetivoFinal = [...comprasObjetivo];
       let regaloRoboJusto = false;
-      if (expPrevio < 4 && nuevaExpObjetivo === 4 && !objetivoUser.roboJustoCompradoTramo) {
-        if (!comprasObjetivoFinal.includes('Robo Justo')) {
-          comprasObjetivoFinal.push('Robo Justo');
+      if (expPrevioDef < 4 && nuevaExpObjetivoBase === 4 && !objetivoUser.roboJustoCompradoTramo) {
+        if (!comprasObjetivo.includes('Robo Justo')) {
+          comprasObjetivo.push('Robo Justo');
           regaloRoboJusto = true;
         }
       }
@@ -854,9 +966,9 @@ export default function DesafioPokemonApp() {
         if (x.usuario.toLowerCase() === objetivoUser.usuario.toLowerCase()) {
           return {
             ...x,
-            experiencia: nuevaExpObjetivo,
+            experiencia: nuevaExpObjetivoBase,
             karma: nuevoKarmaObjetivo,
-            compras: comprasObjetivoFinal,
+            compras: comprasObjetivo,
             roboJustoCompradoTramo: regaloRoboJusto ? true : x.roboJustoCompradoTramo,
           };
         }
@@ -868,7 +980,7 @@ export default function DesafioPokemonApp() {
       setAtaqueObjetivoUser('');
       setComodinRobarSeleccionado('');
       setCartaModal(null);
-      mostrarNotificacion(`🎴 ¡Has robado con éxito el comodín "${comodinRobarSeleccionado}" a ${objetivoUser.usuario}!`);
+      mostrarNotificacion(`🎴 ¡Has robado con éxito el comodín "${comodinRobarSeleccionado}" a ${objetivoUser.usuario}! Al defensor le sube 1 nivel de experiencia.`);
       registrarHistorialAdmin(`Robo de Comodín: ${lg.usuario} robó ${comodinRobarSeleccionado} a ${objetivoUser.usuario}`);
       return;
     }
@@ -907,12 +1019,6 @@ export default function DesafioPokemonApp() {
         return;
       }
 
-      // COMPROBAR SI TIENE ESCUDO PROTECTOR O REVERSA
-      const comprasObjetivoCheck = objetivoUser.compras || [];
-      const tieneReversaObj = comprasObjetivoCheck.some((c: string) => c.toLowerCase() === 'reversa');
-      const tieneEscudoObj = comprasObjetivoCheck.some((c: string) => c.toLowerCase() === 'escudo protector');
-      const tieneProteccion = tieneReversaObj || tieneEscudoObj;
-
       const tipo = cartaDef?.tipoAtaque || (nombreCarta.toLowerCase() === 'robo de monedas' ? 'Especial' : 'Fuerte');
       
       let nuevoKarmaAtacante = lg.karma;
@@ -930,40 +1036,43 @@ export default function DesafioPokemonApp() {
       const nuevasCompras = [...comprasActuales];
       nuevasCompras.splice(index, 1);
 
-      // SI TIENE PROTECCIÓN (ESCUDO O REVERSA): El ataque rebota limpiamente
-      if (tieneProteccion) {
-        const tipoProteccionUsada = tieneReversaObj ? 'Reversa' : 'Escudo protector';
-        const comprasObjetivoLimpias = [...comprasObjetivoCheck];
-        const indexProt = comprasObjetivoLimpias.findIndex(
-          (c: string) => c.toLowerCase() === tipoProteccionUsada.toLowerCase()
-        );
-        if (indexProt !== -1) {
-          comprasObjetivoLimpias.splice(indexProt, 1);
+      const expPrevioDef = objetivoUser.experiencia || 0;
+      const nuevaExpObjetivoBase = Math.min(4, expPrevioDef + 1); // El defensor SIEMPRE sube de nivel al ser atacado
+
+      // SI TIENE REVERSA ACTIVA
+      if (objetivoUser.reversaActiva) {
+        const comprasDefensorActualizadas = [...(objetivoUser.compras || []), nombreCarta]; // El defensor se queda con la carta de ataque
+        let karmaAtacanteTrasRebote = nuevoKarmaAtacante;
+        if (tipo === 'Fuerte' && karmaAtacanteTrasRebote > 0) {
+          karmaAtacanteTrasRebote -= 1; 
         }
+        const karmaObjetivoTrasRebote = (objetivoUser.karma || 0) + 1;
 
-        // El atacante pierde su carta de ataque pero RECIBE DE VUELTA la carta exacta que usó
-        const comprasAtacanteActualizadas = [...nuevasCompras, nombreCarta]; 
-
-        let nuevoKarmaAtacanteTrasRebote = nuevoKarmaAtacante;
-        if (tipo === 'Fuerte' && nuevoKarmaAtacante > 0) {
-          nuevoKarmaAtacanteTrasRebote -= 1; 
+        let regaloRoboJusto = false;
+        let comprasObjetivoFinal = [...comprasDefensorActualizadas];
+        if (expPrevioDef < 4 && nuevaExpObjetivoBase === 4 && !objetivoUser.roboJustoCompradoTramo) {
+          if (!comprasObjetivoFinal.includes('Robo Justo')) {
+            comprasObjetivoFinal.push('Robo Justo');
+            regaloRoboJusto = true;
+          }
         }
-
-        const karmaObjetivoTrasRebote = (objetivoUser.karma || 0) + 1; // El defensor gana ese karma
 
         const actualizados = ps.map((x) => {
           if (x.usuario === lg.usuario) {
             return {
               ...x,
-              karma: nuevoKarmaAtacanteTrasRebote,
-              compras: comprasAtacanteActualizadas,
+              karma: karmaAtacanteTrasRebote,
+              compras: nuevasCompras, // El atacante se queda sin su carta
             };
           }
           if (x.usuario.toLowerCase() === objetivoUser.usuario.toLowerCase()) {
             return {
               ...x,
               karma: karmaObjetivoTrasRebote,
-              compras: comprasObjetivoLimpias,
+              experiencia: nuevaExpObjetivoBase,
+              reversaActiva: false,
+              compras: comprasObjetivoFinal,
+              roboJustoCompradoTramo: regaloRoboJusto ? true : x.roboJustoCompradoTramo,
             };
           }
           return x;
@@ -973,24 +1082,59 @@ export default function DesafioPokemonApp() {
         setLg(actualizados.find((x) => x.usuario === lg.usuario));
         setAtaqueObjetivoUser('');
         setCartaModal(null);
-        mostrarNotificacion(`🔄 ¡${tipoProteccionUsada} activado! El ataque rebotó: recuperas tu carta "${nombreCarta}" en el inventario, pierdes karma y ${objetivoUser.usuario} gana el karma (sin darte ningún escudo extra).`);
-        registrarHistorialAdmin(`Reversa/Escudo devuelto: El ataque ${nombreCarta} de ${lg.usuario} rebotó en ${objetivoUser.usuario}`);
+        mostrarNotificacion(`🔄 ¡Reversa activada! El ataque rebotó: pierdes tu carta "${nombreCarta}" y se la queda ${objetivoUser.usuario}. A ${objetivoUser.usuario} le sube 1 nivel de experiencia.`);
+        registrarHistorialAdmin(`Reversa activada: ${nombreCarta} de ${lg.usuario} rebotó en ${objetivoUser.usuario}`);
+        return;
+      }
+
+      // SI TIENE ESCUDO PROTECTOR ACTIVO
+      if (objetivoUser.escudoActivo) {
+        let karmaAtacanteTrasEscudo = nuevoKarmaAtacante;
+        const karmaObjetivoTrasEscudo = (objetivoUser.karma || 0) + 1;
+
+        let regaloRoboJusto = false;
+        let comprasObjetivoFinal = [...(objetivoUser.compras || [])];
+        if (expPrevioDef < 4 && nuevaExpObjetivoBase === 4 && !objetivoUser.roboJustoCompradoTramo) {
+          if (!comprasObjetivoFinal.includes('Robo Justo')) {
+            comprasObjetivoFinal.push('Robo Justo');
+            regaloRoboJusto = true;
+          }
+        }
+
+        const actualizados = ps.map((x) => {
+          if (x.usuario === lg.usuario) {
+            return {
+              ...x,
+              karma: karmaAtacanteTrasEscudo,
+              compras: nuevasCompras,
+            };
+          }
+          if (x.usuario.toLowerCase() === objetivoUser.usuario.toLowerCase()) {
+            return {
+              ...x,
+              karma: karmaObjetivoTrasEscudo,
+              experiencia: nuevaExpObjetivoBase,
+              escudoActivo: false,
+              compras: comprasObjetivoFinal,
+              roboJustoCompradoTramo: regaloRoboJusto ? true : x.roboJustoCompradoTramo,
+            };
+          }
+          return x;
+        });
+
+        setPs(actualizados);
+        setLg(actualizados.find((x) => x.usuario === lg.usuario));
+        setAtaqueObjetivoUser('');
+        setCartaModal(null);
+        mostrarNotificacion(`🛡️ ¡Escudo protector activado! El ataque fue bloqueado, pero a ${objetivoUser.usuario} le sube 1 nivel de experiencia.`);
+        registrarHistorialAdmin(`Escudo protector bloqueó ataque de ${lg.usuario}`);
         return;
       }
 
       const nuevoKarmaObjetivo = (objetivoUser.karma || 0) + 1;
-
-      let expIncremento = 0;
-      if (tipo === 'Fuerte') expIncremento = 1;
-      else if (tipo === 'Medio') expIncremento = 0.5;
-      else if (tipo === 'Especial' || nombreCarta.toLowerCase() === 'robo de monedas') expIncremento = 0;
-
-      const expPrevio = objetivoUser.experiencia || 0;
-      const nuevaExpObjetivo = Math.min(4, expPrevio + expIncremento);
-
-      let comprasObjetivo = [...(objetivoUser.compras || [])];
       let regaloRoboJusto = false;
-      if (expPrevio < 4 && nuevaExpObjetivo === 4 && !objetivoUser.roboJustoCompradoTramo) {
+      let comprasObjetivo = [...(objetivoUser.compras || [])];
+      if (expPrevioDef < 4 && nuevaExpObjetivoBase === 4 && !objetivoUser.roboJustoCompradoTramo) {
         if (!comprasObjetivo.includes('Robo Justo')) {
           comprasObjetivo.push('Robo Justo');
           regaloRoboJusto = true;
@@ -1009,7 +1153,7 @@ export default function DesafioPokemonApp() {
           const sumarMonedasRobo = nombreCarta.toLowerCase() === 'robo de monedas';
           return {
             ...x,
-            experiencia: nuevaExpObjetivo,
+            experiencia: nuevaExpObjetivoBase,
             karma: nuevoKarmaObjetivo,
             compras: comprasObjetivo,
             roboJustoCompradoTramo: regaloRoboJusto ? true : x.roboJustoCompradoTramo,
@@ -1033,7 +1177,7 @@ export default function DesafioPokemonApp() {
       setLg(finalActualizados.find((x) => x.usuario === lg.usuario));
       setAtaqueObjetivoUser('');
       setCartaModal(null);
-      mostrarNotificacion(`⚔️ Ataque exitoso (${tipo}) contra ${objetivoUser.usuario}. Karma y EXP transferidos.${regaloRoboJusto ? ' ¡Se le otorgó un Robo Justo gratis por llegar a 4 EXP!' : ''}`);
+      mostrarNotificacion(`⚔️ Ataque exitoso (${tipo}) contra ${objetivoUser.usuario}. A ${objetivoUser.usuario} le sube 1 nivel de experiencia.`);
       registrarHistorialAdmin(`Ataque (${tipo}): ${nombreCarta} de ${lg.usuario} a ${objetivoUser.usuario}`);
       return;
     }
@@ -1202,7 +1346,7 @@ export default function DesafioPokemonApp() {
     if (lg.usuario === adminTargetUser) {
       setLg(actualizados.find((x) => x.usuario === lg.usuario));
     }
-    mostrarNotificacion(`Carta "${adminCartaSel}" entregada a ${adminTargetUser}`);
+    mostrarNotificacion(`Carta "${adminCartaSel}" entregada a ${adminTargetUser} (Recuerda que debe darle a USAR para activarla)`);
   };
 
   const adminEnviarMensaje = () => {
@@ -1257,9 +1401,6 @@ export default function DesafioPokemonApp() {
   };
 
   const badgeInfo = getBadgeExperiencia(lg?.experiencia || 0);
-  const tieneEscudoActivo = (lg?.compras || []).some(
-    (c: string) => c.toLowerCase() === 'escudo protector' || c.toLowerCase() === 'reversa'
-  );
 
   if (!lg) {
     return (
@@ -1324,7 +1465,7 @@ export default function DesafioPokemonApp() {
           </button>
 
           <div className="text-[10px] text-slate-500 text-center mt-2">
-            Contraseña por defecto nuevos usuarios: [nombreusuario]123 (Ej: reejaas93123)
+            Contraseña por defecto nuevos usuarios: [nombreusuario]123
           </div>
         </form>
       </div>
@@ -1428,14 +1569,13 @@ export default function DesafioPokemonApp() {
           <div className="h-4 w-[1px] bg-slate-700" />
           <div 
             className={`flex items-center gap-1.5 font-black px-2.5 py-1 rounded-xl text-[11px] border ${
-              tieneEscudoActivo 
+              lg.escudoActivo || lg.reversaActiva 
                 ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-[0_0_10px_rgba(6,182,212,0.3)]' 
                 : 'bg-slate-800/50 text-slate-400 border-slate-700'
             }`}
-            title={tieneEscudoActivo ? 'Protección (Escudo o Reversa) activa en tu inventario' : 'Sin protección activa'}
           >
             <span>🛡️</span>
-            <span>{tieneEscudoActivo ? 'PROTECCIÓN ACTIVADA' : 'SIN PROTECCIÓN'}</span>
+            <span>{lg.reversaActiva ? 'REVERSA ACTIVA' : lg.escudoActivo ? 'ESCUDO ACTIVO' : 'SIN PROTECCIÓN'}</span>
           </div>
         </div>
 
@@ -1496,12 +1636,12 @@ export default function DesafioPokemonApp() {
                   <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
                     <div className="flex justify-between items-center mb-1">
                       <span className="text-xs font-bold text-yellow-400">
-                        🛡️ Actualización de Reversa
+                        🛡️ Reglas de Reversa y Experiencia
                       </span>
                       <span className="text-[10px] text-slate-500">Hoy</span>
                     </div>
                     <p className="text-xs text-slate-300 leading-relaxed">
-                      La Reversa actúa por sí misma como escudo automático. Al recibir un ataque, este rebota de inmediato: el atacante pierde su carta y su karma, tú ganas el karma y recibes la carta exacta que usaron en tu contra, sin otorgar ningún escudo protector extra.
+                      Las cartas de Escudo Protector y Reversa no se activan al recibirlas; debes darles a "USAR" para mantenerlas activas. Al recibir cualquier ataque, la experiencia del defensor siempre sube 1 nivel (tenga escudo o reversa). Si usa la Reversa, el ataque rebota, el defensor se queda con la carta con la que le atacaron y el atacante se queda sin ella.
                     </p>
                   </div>
                 </div>
@@ -1522,8 +1662,8 @@ export default function DesafioPokemonApp() {
                   </div>
                   <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
                     <span className="text-slate-400">Protección:</span>
-                    <span className={`font-bold ${tieneEscudoActivo ? 'text-cyan-400' : 'text-slate-500'}`}>
-                      {tieneEscudoActivo ? 'Activa' : 'Inactiva'}
+                    <span className={`font-bold ${lg.escudoActivo || lg.reversaActiva ? 'text-cyan-400' : 'text-slate-500'}`}>
+                      {lg.reversaActiva ? 'Reversa' : lg.escudoActivo ? 'Escudo' : 'Inactiva'}
                     </span>
                   </div>
                 </div>
@@ -1555,9 +1695,8 @@ export default function DesafioPokemonApp() {
                       <tr key={p.usuario} className="hover:bg-slate-950/50 transition">
                         <td className="py-4 px-4 font-black text-white flex items-center gap-2">
                           {p.usuario} {p.usuario === lg.usuario && <span className="text-[10px] bg-pink-500/20 text-pink-400 px-2 py-0.5 rounded-full">Tú</span>}
-                          {ADMINS.map(a => a.toLowerCase()).includes(p.usuario.toLowerCase()) && (
-                            <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded-full">👑 Admin</span>
-                          )}
+                          {p.reversaActiva && <span className="text-[9px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded-full">🔄 Reversa</span>}
+                          {p.escudoActivo && <span className="text-[9px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded-full">🛡️ Escudo</span>}
                         </td>
                         <td className="py-4 px-4 font-bold text-yellow-300">
                           {p.monedas} 🪙
@@ -1879,7 +2018,7 @@ export default function DesafioPokemonApp() {
                 >
                   {ps.map((u) => (
                     <option key={u.usuario} value={u.usuario}>
-                      {u.usuario} {(u.compras || []).some((c: string) => c.toLowerCase() === 'escudo protector' || c.toLowerCase() === 'reversa') ? '(🛡️ Protegido)' : '(Sin Protección)'}
+                      {u.usuario} {u.reversaActiva ? '(🔄 Reversa Activa)' : u.escudoActivo ? '(🛡️ Escudo Activo)' : '(Sin Protección Activa)'}
                     </option>
                   ))}
                 </select>
@@ -2071,7 +2210,7 @@ export default function DesafioPokemonApp() {
                         ))}
                     </select>
                     <p className="text-[10px] text-yellow-300 font-bold mt-2">
-                      {cartaModal.tipoAtaque === 'Fuerte' ? '⚡ Este ataque consume 1 de Karma (si tienes) y otorga +1 EXP al rival.' : '⚡ Este ataque afecta al rival según su categoría.'}
+                      {cartaModal.tipoAtaque === 'Fuerte' ? '⚡ Este ataque consume 1 de Karma y al defensor le subirá 1 nivel de experiencia.' : '⚡ Este ataque afecta al rival y le subirá 1 nivel de experiencia.'}
                     </p>
                   </div>
                 )}
