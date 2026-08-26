@@ -7,7 +7,6 @@ import { useEffect, useState } from 'react';
 ========================================================= */
 
 const ADMINS = ['Rexitoo', 'alex96', 'Redsam', 'Poke589', 'Faxzer0', 'ikerglz_'];
-const ADMIN_HISTORY_USER = 'Rexitoo,Faxzer0';
 
 const N = [
   // CURA Y APOYO
@@ -407,7 +406,7 @@ const PT_INICIAL = [
     {
       id: 1,
       emisor: 'Admin (Rexitoo)',
-      mensaje: '¡Bienvenido al Desafío Pokémon! Revisa las reglas en el inicio.',
+      mensaje: '¡Bienvenido al Desafío Pokémon! Revisa el Historial Global para ver las acciones de todos.',
       fecha: 'Hoy, 10:00',
       leido: false,
     },
@@ -429,9 +428,7 @@ export default function DesafioPokemonApp() {
     return PT_INICIAL;
   });
 
-  const [lg, setLg] = useState<any>(null);
-  
-  // HISTORIAL GLOBAL PÚBLICO PARA TODOS
+  // HISTORIAL GLOBAL COMPARTIDO
   const [historialGlobal, setHistorialGlobal] = useState<any[]>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('desafio_historial_global');
@@ -442,45 +439,36 @@ export default function DesafioPokemonApp() {
     return [];
   });
 
-  const registrarAccionGlobal = (descripcion: string, tipo: string = 'ACCION') => {
-    const nuevaEntrada = {
-      id: Date.now(),
-      fecha: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      usuario: lg?.usuario || 'Sistema',
-      descripcion,
-      tipo,
-    };
-    setHistorialGlobal((prev) => {
-      const actualizado = [nuevaEntrada, ...prev];
-      localStorage.setItem('desafio_historial_global', JSON.stringify(actualizado));
-      return actualizado;
-    });
-  };
-
+  const [lg, setLg] = useState<any>(null);
   const [inputUser, setInputUser] = useState('');
   const [inputPass, setInputPass] = useState('');
   const [loginError, setLoginError] = useState('');
   const [seccionActual, setSeccionActual] = useState('INICIO');
-  const [busqueda, setBusqueda] = useState('');
-  const [categoriaFiltro, setCategoriaFiltro] = useState('Todas');
   const [cartaModal, setCartaModal] = useState<any>(null);
-  const [ventaIlegalObjetivo, setVentaIlegalObjetivo] = useState('');
-  const [revivirPokemonInput, setRevivirPokemonInput] = useState('');
   const [ataqueObjetivoUser, setAtaqueObjetivoUser] = useState('');
-  const [comodinRobarSeleccionado, setComodinRobarSeleccionado] = useState('');
   const [notificacion, setNotificacion] = useState({ texto: '', visible: false });
-  const [adminTargetUser, setAdminTargetUser] = useState(PT_INICIAL[0].usuario);
-  const [adminAmount, setAdminAmount] = useState(10);
-  const [adminCartaSel, setAdminCartaSel] = useState(CARTAS[0].nombre);
-  const [adminMsgText, setAdminMsgText] = useState('');
-
-  const isAdmin = ADMINS.map(a => a.toLowerCase()).includes(lg?.usuario?.toLowerCase() || '');
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('desafio_pokemon_ps', JSON.stringify(ps));
     }
   }, [ps]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('desafio_historial_global', JSON.stringify(historialGlobal));
+    }
+  }, [historialGlobal]);
+
+  const registrarHistorialGlobal = (tipo: string, descripcion: string) => {
+    const nuevoEvento = {
+      id: Date.now(),
+      tipo,
+      descripcion,
+      fecha: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+    };
+    setHistorialGlobal((prev) => [nuevoEvento, ...prev]);
+  };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -505,18 +493,6 @@ export default function DesafioPokemonApp() {
   const mostrarNotificacion = (msg: string) => {
     setNotificacion({ texto: msg, visible: true });
     setTimeout(() => setNotificacion({ texto: '', visible: false }), 4000);
-  };
-
-  const reiniciarTodo = () => {
-    if (!isAdmin) return;
-    if (!window.confirm('¿Reiniciar todo el desafío?')) return;
-    localStorage.removeItem('desafio_pokemon_ps');
-    localStorage.removeItem('desafio_historial_global');
-    setPs(PT_INICIAL);
-    setLg(PT_INICIAL.find((u) => u.usuario.toLowerCase() === lg?.usuario?.toLowerCase()) || PT_INICIAL[0]);
-    setHistorialGlobal([]);
-    registrarAccionGlobal('El administrador reinició todo el sistema.', 'ADMIN');
-    mostrarNotificacion('🔄 ¡Sistema reiniciado!');
   };
 
   const comprar = (carta: any) => {
@@ -559,7 +535,10 @@ export default function DesafioPokemonApp() {
 
     setPs(actualizados);
     setLg(actualizados.find((x) => x.usuario === lg.usuario));
-    registrarAccionGlobal(`${lg.usuario} compró la carta [${carta.nombre}] por ${precioFinal} monedas.`, 'COMPRA');
+    
+    // Registrar en el Historial Global
+    registrarHistorialGlobal('COMPRA', `${lg.usuario} compró la carta [${carta.nombre}] por ${precioFinal} monedas.`);
+    
     mostrarNotificacion(`Comprado con Éxito\nHas comprado ${carta.nombre}`);
   };
 
@@ -571,10 +550,12 @@ export default function DesafioPokemonApp() {
       const index = comprasActuales.findIndex((c: string) => c.toLowerCase() === nombreCarta.toLowerCase());
       if (index === -1) { mostrarNotificacion('❌ No tienes esta carta.'); return; }
       if (lg.escudoActivo) { mostrarNotificacion('⚠️ Ya tienes un Escudo activo.'); return; }
+      
       const nuevasCompras = [...comprasActuales]; nuevasCompras.splice(index, 1);
       const actualizados = ps.map((x) => x.usuario === lg.usuario ? { ...x, compras: nuevasCompras, escudoActivo: true } : x);
+      
       setPs(actualizados); setLg(actualizados.find((x) => x.usuario === lg.usuario)); setCartaModal(null);
-      registrarAccionGlobal(`${lg.usuario} activó su [Escudo protector].`, 'DEFENSA');
+      registrarHistorialGlobal('DEFENSA', `${lg.usuario} activó su [Escudo protector].`);
       mostrarNotificacion('🛡️ ¡Escudo protector activado!');
       return;
     }
@@ -583,10 +564,12 @@ export default function DesafioPokemonApp() {
       const index = comprasActuales.findIndex((c: string) => c.toLowerCase() === nombreCarta.toLowerCase());
       if (index === -1) { mostrarNotificacion('❌ No tienes esta carta.'); return; }
       if (lg.reversaActiva) { mostrarNotificacion('⚠️ Ya tienes Reversa activa.'); return; }
+
       const nuevasCompras = [...comprasActuales]; nuevasCompras.splice(index, 1);
       const actualizados = ps.map((x) => x.usuario === lg.usuario ? { ...x, compras: nuevasCompras, reversaActiva: true } : x);
+      
       setPs(actualizados); setLg(actualizados.find((x) => x.usuario === lg.usuario)); setCartaModal(null);
-      registrarAccionGlobal(`${lg.usuario} activó su carta [Reversa].`, 'DEFENSA');
+      registrarHistorialGlobal('DEFENSA', `${lg.usuario} activó su carta [Reversa].`);
       mostrarNotificacion('🔄 ¡Reversa activada!');
       return;
     }
@@ -601,10 +584,11 @@ export default function DesafioPokemonApp() {
       const indexPropio = comprasActuales.findIndex((c: string) => c.toLowerCase() === nombreCarta.toLowerCase());
       if (indexPropio === -1) { mostrarNotificacion('❌ No tienes esta carta en tu inventario.'); return; }
 
-      // Resolver Reversa o Escudo del defensor
+      // Resolver Reversa
       if (objetivoUser.reversaActiva) {
         const nuevasComprasPropias = [...comprasActuales]; nuevasComprasPropias.splice(indexPropio, 1);
         const comprasDefensor = [...(objetivoUser.compras || []), nombreCarta];
+        
         const actualizados = ps.map((x) => {
           if (x.usuario === lg.usuario) return { ...x, compras: nuevasComprasPropias, karma: Math.max(0, x.karma - 1) };
           if (x.usuario.toLowerCase() === objetivoUser.usuario.toLowerCase()) {
@@ -614,13 +598,16 @@ export default function DesafioPokemonApp() {
         });
         setPs(actualizados); setLg(actualizados.find((x) => x.usuario === lg.usuario));
         setAtaqueObjetivoUser(''); setCartaModal(null);
-        registrarAccionGlobal(`${lg.usuario} atacó a ${objetivoUser.usuario} con [${nombreCarta}], pero rebotó por la [Reversa] de ${objetivoUser.usuario}.`, 'ATAQUE-REBOTE');
+
+        registrarHistorialGlobal('REBOTE', `${lg.usuario} atacó a ${objetivoUser.usuario} con [${nombreCarta}], ¡pero la [Reversa] de ${objetivoUser.usuario} devolvió el ataque y se quedó con la carta!`);
         mostrarNotificacion(`🔄 ¡Reversa activada! El ataque rebotó en ${objetivoUser.usuario}.`);
         return;
       }
 
+      // Resolver Escudo
       if (objetivoUser.escudoActivo) {
         const nuevasComprasPropias = [...comprasActuales]; nuevasComprasPropias.splice(indexPropio, 1);
+
         const actualizados = ps.map((x) => {
           if (x.usuario === lg.usuario) return { ...x, compras: nuevasComprasPropias };
           if (x.usuario.toLowerCase() === objetivoUser.usuario.toLowerCase()) {
@@ -630,13 +617,15 @@ export default function DesafioPokemonApp() {
         });
         setPs(actualizados); setLg(actualizados.find((x) => x.usuario === lg.usuario));
         setAtaqueObjetivoUser(''); setCartaModal(null);
-        registrarAccionGlobal(`${lg.usuario} atacó a ${objetivoUser.usuario} con [${nombreCarta}], pero el [Escudo protector] lo bloqueó.`, 'ATAQUE-BLOQUEADO');
+
+        registrarHistorialGlobal('BLOQUEO', `${lg.usuario} intentó atacar a ${objetivoUser.usuario} con [${nombreCarta}], pero el [Escudo protector] de ${objetivoUser.usuario} lo bloqueó.`);
         mostrarNotificacion(`🛡️ ¡Escudo bloqueó el ataque de ${lg.usuario}!`);
         return;
       }
 
-      // Ataque exitoso normal
+      // Ataque exitoso
       const nuevasComprasPropias = [...comprasActuales]; nuevasComprasPropias.splice(indexPropio, 1);
+      
       const actualizados = ps.map((x) => {
         if (x.usuario === lg.usuario) return { ...x, compras: nuevasComprasPropias, karma: Math.max(0, x.karma - 1) };
         if (x.usuario.toLowerCase() === objetivoUser.usuario.toLowerCase()) {
@@ -646,24 +635,15 @@ export default function DesafioPokemonApp() {
       });
       setPs(actualizados); setLg(actualizados.find((x) => x.usuario === lg.usuario));
       setAtaqueObjetivoUser(''); setCartaModal(null);
-      registrarAccionGlobal(`${lg.usuario} usó [${nombreCarta}] contra ${objetivoUser.usuario} con éxito.`, 'ATAQUE');
+
+      registrarHistorialGlobal('ATAQUE', `${lg.usuario} atacó a ${objetivoUser.usuario} utilizando la carta [${nombreCarta}] con éxito.`);
       mostrarNotificacion(`⚔️ ¡Ataque exitoso contra ${objetivoUser.usuario}!`);
       return;
     }
 
+    registrarHistorialGlobal('USO', `${lg.usuario} usó la carta [${nombreCarta}].`);
     mostrarNotificacion(`Has usado la carta ${nombreCarta}`);
-    registrarAccionGlobal(`${lg.usuario} usó la carta [${nombreCarta}].`, 'USO');
   };
-
-  const getBadgeExperiencia = (exp: number) => {
-    if (exp >= 4) return { icono: '🔴', nombre: 'Masterball' };
-    if (exp >= 3) return { icono: '🟣', nombre: 'Ultraball' };
-    if (exp >= 2) return { icono: '🔵', nombre: 'Superball' };
-    if (exp >= 1) return { icono: '⚪', nombre: 'Pokeball' };
-    return { icono: '💤', nombre: 'Sin EXP' };
-  };
-
-  const badgeInfo = getBadgeExperiencia(lg?.experiencia || 0);
 
   if (!lg) {
     return (
@@ -695,10 +675,9 @@ export default function DesafioPokemonApp() {
             {[
               { id: 'INICIO', label: 'INICIO', icon: '🏠' },
               { id: 'PARTICIPANTES', label: 'PARTICIPANTES', icon: '👥' },
-              { id: 'HISTORIAL', label: 'HISTORIAL GLOBAL', icon: '📜' },
+              { id: 'HISTORIAL_GLOBAL', label: '📜 HISTORIAL GLOBAL', icon: '📜' },
               { id: 'COMODINES', label: 'COMODINES', icon: '🎴' },
               { id: 'BUZÓN', label: 'BUZÓN', icon: '📬' },
-              { id: 'RULETAS', label: 'RULETAS', icon: '🎰' },
             ].map((item) => (
               <button
                 key={item.id}
@@ -711,14 +690,6 @@ export default function DesafioPokemonApp() {
                 <span>{item.label}</span>
               </button>
             ))}
-            {isAdmin && (
-              <button
-                onClick={() => setSeccionActual('ADMIN')}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg ${seccionActual === 'ADMIN' ? 'bg-amber-500 text-black font-black' : 'text-amber-400 hover:bg-amber-950/40'}`}
-              >
-                <span>👑</span><span>ADMIN</span>
-              </button>
-            )}
           </nav>
         </div>
         <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 flex flex-col gap-2">
@@ -731,40 +702,38 @@ export default function DesafioPokemonApp() {
       {/* MAIN */}
       <main className="flex-1 bg-gradient-to-br from-[#4a0043] via-[#240022] to-[#120015] p-6 overflow-y-auto flex flex-col items-center relative">
         
-        {/* HISTORIAL GLOBAL PÚBLICO */}
-        {seccionActual === 'HISTORIAL' && (
+        {/* SECCIÓN HISTORIAL GLOBAL (VISIBLE PARA TODOS) */}
+        {seccionActual === 'HISTORIAL_GLOBAL' && (
           <div className="w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl">
             <h2 className="text-xl font-black text-pink-400 border-b border-slate-800 pb-3 mb-6 flex items-center gap-2">
-              📜 Historial Global de Partida (Visible para todos)
+              📜 Historial Global de la Partida (Todos los participantes)
             </h2>
             <div className="flex flex-col gap-3 max-h-[70vh] overflow-y-auto pr-2">
-              {historialGlobal.map((h) => (
+              {historialGlobal.map((h: any) => (
                 <div key={h.id} className="bg-slate-950 border border-slate-800 p-3.5 rounded-xl flex items-start justify-between gap-4 text-xs">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-pink-400 font-black">{h.usuario}</span>
-                      <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded uppercase font-bold">{h.tipo}</span>
+                      <span className="text-[10px] bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded uppercase font-bold">{h.tipo}</span>
                       <span className="text-[10px] text-slate-500">{h.fecha}</span>
                     </div>
-                    <p className="text-slate-300 font-medium">{h.descripcion}</p>
+                    <p className="text-slate-200 font-medium">{h.descripcion}</p>
                   </div>
                 </div>
               ))}
               {historialGlobal.length === 0 && (
                 <div className="text-center py-12 text-slate-500 text-xs">
-                  Aún no hay registros en el historial de la partida.
+                  Aún no hay registros en el historial global. ¡Realiza compras o ataques para verlos aquí!
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {/* RESTO DE SECCIONES (INICIO, PARTICIPANTES, COMODINES, ETC.) */}
         {seccionActual === 'INICIO' && (
           <div className="w-full max-w-5xl flex flex-col gap-6">
             <div className="bg-white/10 p-6 rounded-3xl border border-white/10">
               <h1 className="text-xl font-black text-white">¡Hola, {lg.usuario}! 👋</h1>
-              <p className="text-xs text-pink-200 mt-1">Bienvenido al Panel Oficial del Desafío Pokémon. Revisa el nuevo Historial Global para ver las acciones de todos.</p>
+              <p className="text-xs text-pink-200 mt-1">Dirígete a la sección <span className="font-bold text-white">"HISTORIAL GLOBAL"</span> en el menú para ver qué cartas compran los demás, quién ataca a quién y cómo se resuelven los combates.</p>
             </div>
           </div>
         )}
@@ -777,30 +746,22 @@ export default function DesafioPokemonApp() {
                 <tr className="border-b border-slate-800 text-slate-400">
                   <th className="py-3 px-4">Participante</th>
                   <th className="py-3 px-4">Monedas</th>
-                  <th className="py-3 px-4">Karma / EXP</th>
-                  <th className="py-3 px-4">Comodines</th>
+                  <th className="py-3 px-4">Comodines en inventario</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
-                {ps.map((p) => {
-                  const esAdmin = ADMINS.map(a => a.toLowerCase()).includes(p.usuario.toLowerCase());
-                  return (
-                    <tr key={p.usuario} className="hover:bg-slate-950/50">
-                      <td className="py-4 px-4 font-black text-white flex items-center gap-2">
-                        {p.usuario} {esAdmin && <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30">👑 [Admin]</span>}
-                      </td>
-                      <td className="py-4 px-4 font-bold text-yellow-300">{p.monedas} 🪙</td>
-                      <td className="py-4 px-4 font-bold text-purple-300">{p.karma} ⚡ | {p.experiencia} EXP</td>
-                      <td className="py-4 px-4 text-slate-400">{(p.compras || []).length} comodines</td>
-                    </tr>
-                  );
-                })}
+                {ps.map((p) => (
+                  <tr key={p.usuario} className="hover:bg-slate-950/50">
+                    <td className="py-4 px-4 font-black text-white">{p.usuario}</td>
+                    <td className="py-4 px-4 font-bold text-yellow-300">{p.monedas} 🪙</td>
+                    <td className="py-4 px-4 text-slate-400">{(p.compras || []).length} comodines</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         )}
 
-        {/* COMODINES */}
         {seccionActual === 'COMODINES' && (
           <div className="w-full max-w-5xl bg-white text-slate-800 rounded-3xl p-6 shadow-2xl flex flex-col max-h-[85vh]">
             <div className="flex justify-between items-center mb-4">
@@ -815,14 +776,6 @@ export default function DesafioPokemonApp() {
                 </div>
               ))}
             </div>
-          </div>
-        )}
-
-        {/* ADMIN */}
-        {seccionActual === 'ADMIN' && isAdmin && (
-          <div className="w-full max-w-5xl bg-slate-900 border border-amber-500/30 rounded-3xl p-6 shadow-2xl flex flex-col gap-6">
-            <h2 className="text-xl font-black text-amber-400 border-b border-slate-800 pb-3">👑 Panel de Control del Admin</h2>
-            <button onClick={reiniciarTodo} className="py-3 bg-red-600 hover:bg-red-500 font-black text-xs text-white rounded-xl">🔄 REINICIAR TODO EL DESAFÍO</button>
           </div>
         )}
 
