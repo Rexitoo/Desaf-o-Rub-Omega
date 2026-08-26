@@ -21,7 +21,7 @@ const N = [
     n: 'Dama de la cura',
     c: 'Cura',
     p: 3,
-    d: 'Puedes comprar hasta 5 objetos curativos por tramo (máximo 1 Dama de la Cura por tramo)-(Abrir ticket para comprobación9.',
+    d: 'Puedes comprar hasta 5 objetos curativos por tramo (máximo 1 Dama de la Cura por tramo)-(Abrir ticket para comprobación).',
   },
   {
     n: 'Amor para dar',
@@ -204,7 +204,7 @@ const N = [
     c: 'Revivir',
     p: 0,
     soloRuleta: true,
-    d: 'Usa este comodín para activar un Escudo protector automático. Si te atacan, el ataque rebota, se devuelve al atacante y recibes la carta que usaron en tu contra.',
+    d: 'Usa este comodín para activar un escudo protector automático. Si te atacan, el ataque rebota, se devuelve al atacante y recibes la carta que usaron en tu contra.',
   },
 
   // ECONOMÍA
@@ -568,14 +568,14 @@ export default function DesafioPokemonApp() {
     }
 
     const comprasActuales = objetivoUser.compras || [];
-    const tieneEscudo = comprasActuales.some((c: string) => c.toLowerCase() === 'escudo protector');
+    const tieneEscudoOReversa = comprasActuales.some((c: string) => c.toLowerCase() === 'escudo protector' || c.toLowerCase() === 'reversa');
 
-    if (!tieneEscudo) {
-      mostrarNotificacion(`⚠️ El usuario ${objetivoUser.usuario} no tiene ningún escudo protector activo.`);
+    if (!tieneEscudoOReversa) {
+      mostrarNotificacion(`⚠️ El usuario ${objetivoUser.usuario} no tiene ningún escudo protector ni reversa activa.`);
       return;
     }
 
-    const nuevasCompras = comprasActuales.filter((c: string) => c.toLowerCase() !== 'escudo protector');
+    const nuevasCompras = comprasActuales.filter((c: string) => c.toLowerCase() !== 'escudo protector' && c.toLowerCase() !== 'reversa');
 
     const actualizados = ps.map((x) => {
       if (x.usuario.toLowerCase() === objetivoUser.usuario.toLowerCase()) {
@@ -589,8 +589,8 @@ export default function DesafioPokemonApp() {
       setLg(actualizados.find((x) => x.usuario === lg.usuario));
     }
 
-    mostrarNotificacion(`🛡️ ¡Se ha reiniciado/retirado el escudo protector de ${objetivoUser.usuario}!`);
-    registrarHistorialAdmin(`Admin reinició el escudo protector de ${objetivoUser.usuario}`);
+    mostrarNotificacion(`🛡️ ¡Se ha retirado la protección activa de ${objetivoUser.usuario}!`);
+    registrarHistorialAdmin(`Admin retiró la protección activa de ${objetivoUser.usuario}`);
   };
 
   const getPrecioRoboJusto = (user: any) => {
@@ -679,38 +679,9 @@ export default function DesafioPokemonApp() {
       return;
     }
 
-    // LÓGICA DE REVERSA: Al usar Reversa, te otorga automáticamente un Escudo Protector
+    // LÓGICA DE REVERSA: Se mantiene en el inventario como protección activa (no requiere dar clic en "Usar" para activarse, o se puede dejar en inventario como escudo).
     if (nombreCarta.toLowerCase() === 'reversa') {
-      const cartaEncontrada = comprasActuales.find(
-        (c: string) => c.toLowerCase() === nombreCarta.toLowerCase()
-      );
-      if (!cartaEncontrada) {
-        mostrarNotificacion('❌ No tienes esta carta en el inventario.');
-        return;
-      }
-
-      const indexPropio = comprasActuales.findIndex(
-        (c: string) => c.toLowerCase() === nombreCarta.toLowerCase()
-      );
-      const nuevasComprasPropias = [...comprasActuales];
-      nuevasComprasPropias.splice(indexPropio, 1);
-      nuevasComprasPropias.push('Escudo protector'); // Coloca automáticamente el escudo protector
-
-      const actualizados = ps.map((x) => {
-        if (x.usuario === lg.usuario) {
-          return {
-            ...x,
-            compras: nuevasComprasPropias,
-          };
-        }
-        return x;
-      });
-
-      setPs(actualizados);
-      setLg(actualizados.find((x) => x.usuario === lg.usuario));
-      setCartaModal(null);
-      mostrarNotificacion('🔄 ¡Has activado la Reversa! Se ha añadido un Escudo protector en tu inventario a la espera de devolver el golpe.');
-      registrarHistorialAdmin(`Reversa activada: ${lg.usuario} usó Reversa y obtuvo un Escudo protector.`);
+      mostrarNotificacion('🔄 La Reversa funciona automáticamente como escudo protector en tu inventario. ¡Cuando te ataquen, rebotará de inmediato contra el atacante!');
       return;
     }
 
@@ -784,6 +755,52 @@ export default function DesafioPokemonApp() {
 
       if (!objetivoUser) {
         mostrarNotificacion('❌ Participante no encontrado.');
+        return;
+      }
+
+      // Comprobar si el objetivo tiene Escudo protector o Reversa
+      const comprasObjetivoCheck = objetivoUser.compras || [];
+      const tieneEscudoOReversaObj = comprasObjetivoCheck.some(
+        (c: string) => c.toLowerCase() === 'escudo protector' || c.toLowerCase() === 'reversa'
+      );
+
+      if (tieneEscudoOReversaObj) {
+        const tipoProteccion = comprasObjetivoCheck.some((c: string) => c.toLowerCase() === 'reversa') ? 'Reversa' : 'Escudo protector';
+        const indexProteccion = comprasObjetivoCheck.findIndex(
+          (c: string) => c.toLowerCase() === tipoProteccion.toLowerCase()
+        );
+        const comprasObjetivoLimpias = [...comprasObjetivoCheck];
+        if (indexProteccion !== -1) comprasObjetivoLimpias.splice(indexProteccion, 1);
+
+        const indexPropio = comprasActuales.findIndex(
+          (c: string) => c.toLowerCase() === nombreCarta.toLowerCase()
+        );
+        const nuevasComprasPropias = [...comprasActuales];
+        nuevasComprasPropias.splice(indexPropio, 1);
+        nuevasComprasPropias.push(nombreCarta); // Recibe de vuelta su carta de ataque
+
+        let karmaAtacante = lg.karma;
+        if (karmaAtacante > 0) karmaAtacante -= 1; // El atacante pierde su karma
+
+        const karmaObjetivo = (objetivoUser.karma || 0) + 1; // El defensor gana el karma
+
+        const actualizados = ps.map((x) => {
+          if (x.usuario === lg.usuario) {
+            return { ...x, karma: karmaAtacante, compras: nuevasComprasPropias };
+          }
+          if (x.usuario.toLowerCase() === objetivoUser.usuario.toLowerCase()) {
+            return { ...x, karma: karmaObjetivo, compras: comprasObjetivoLimpias };
+          }
+          return x;
+        });
+
+        setPs(actualizados);
+        setLg(actualizados.find((x) => x.usuario === lg.usuario));
+        setAtaqueObjetivoUser('');
+        setComodinRobarSeleccionado('');
+        setCartaModal(null);
+        mostrarNotificacion(`🔄 ¡${tipoProteccion} activado! El ataque rebotó: ${lg.usuario} pierde 1 de karma, recupera su carta "${nombreCarta}" y ${objetivoUser.usuario} gana el karma.`);
+        registrarHistorialAdmin(`Reversa/Escudo devuelto: ${nombreCarta} de ${lg.usuario} rebotó en ${objetivoUser.usuario}`);
         return;
       }
 
@@ -890,8 +907,10 @@ export default function DesafioPokemonApp() {
         return;
       }
 
-      const tieneEscudoProtector = (objetivoUser.compras || []).some(
-        (c: string) => c.toLowerCase() === 'escudo protector'
+      // COMPROBAR SI TIENE ESCUDO PROTECTOR O REVERSA
+      const comprasObjetivoCheck = objetivoUser.compras || [];
+      const tieneProteccion = comprasObjetivoCheck.some(
+        (c: string) => c.toLowerCase() === 'escudo protector' || c.toLowerCase() === 'reversa'
       );
 
       const tipo = cartaDef?.tipoAtaque || (nombreCarta.toLowerCase() === 'robo de monedas' ? 'Especial' : 'Fuerte');
@@ -911,22 +930,26 @@ export default function DesafioPokemonApp() {
       const nuevasCompras = [...comprasActuales];
       nuevasCompras.splice(index, 1);
 
-      // SI TIENE ESCUDO PROTECTOR (REVERSA EXITOSA): Se devuelve el efecto y la carta al atacante
-      if (tieneEscudoProtector) {
-        const comprasObjetivoLimpias = [...(objetivoUser.compras || [])];
-        const indexEscudo = comprasObjetivoLimpias.findIndex(
-          (c: string) => c.toLowerCase() === 'escudo protector'
+      // SI TIENE PROTECCIÓN (ESCUDO O REVERSA): El ataque rebota
+      if (tieneProteccion) {
+        const tipoProteccionUsada = comprasObjetivoCheck.some((c: string) => c.toLowerCase() === 'reversa') ? 'Reversa' : 'Escudo protector';
+        const comprasObjetivoLimpias = [...comprasObjetivoCheck];
+        const indexProt = comprasObjetivoLimpias.findIndex(
+          (c: string) => c.toLowerCase() === tipoProteccionUsada.toLowerCase()
         );
-        if (indexEscudo !== -1) {
-          comprasObjetivoLimpias.splice(indexEscudo, 1);
+        if (indexProt !== -1) {
+          comprasObjetivoLimpias.splice(indexProt, 1);
         }
 
-        const comprasAtacanteActualizadas = [...nuevasCompras, nombreCarta]; // Recibe de vuelta la carta que intentó tirar
+        // El atacante pierde su carta de ataque pero RECIBE DE VUELTA la carta exacta que usó, y pierde 1 de karma adicional si era fuerte (o el karma del rebote)
+        const comprasAtacanteActualizadas = [...nuevasCompras, nombreCarta]; 
 
         let nuevoKarmaAtacanteTrasRebote = nuevoKarmaAtacante;
         if (tipo === 'Fuerte' && nuevoKarmaAtacante > 0) {
-          nuevoKarmaAtacanteTrasRebote -= 1;
+          nuevoKarmaAtacanteTrasRebote -= 1; // Pierde karma por el ataque fallido/rebotado
         }
+
+        const karmaObjetivoTrasRebote = (objetivoUser.karma || 0) + 1; // El defensor gana ese karma
 
         const actualizados = ps.map((x) => {
           if (x.usuario === lg.usuario) {
@@ -939,6 +962,7 @@ export default function DesafioPokemonApp() {
           if (x.usuario.toLowerCase() === objetivoUser.usuario.toLowerCase()) {
             return {
               ...x,
+              karma: karmaObjetivoTrasRebote,
               compras: comprasObjetivoLimpias,
             };
           }
@@ -949,12 +973,12 @@ export default function DesafioPokemonApp() {
         setLg(actualizados.find((x) => x.usuario === lg.usuario));
         setAtaqueObjetivoUser('');
         setCartaModal(null);
-        mostrarNotificacion(`🔄 ¡REVERSA! ${objetivoUser.usuario} tenía el escudo protector activo. El ataque se ha devuelto: ${lg.usuario} sufre el efecto y recibe la carta "${nombreCarta}" de vuelta en su inventario.`);
-        registrarHistorialAdmin(`Reversa devuelta: El ataque ${nombreCarta} de ${lg.usuario} rebotó en ${objetivoUser.usuario}`);
+        mostrarNotificacion(`🔄 ¡${tipoProteccionUsada} activado! El ataque rebotó: ${lg.usuario} pierde karma, recupera su carta "${nombreCarta}" en el inventario y ${objetivoUser.usuario} gana el karma.`);
+        registrarHistorialAdmin(`Reversa/Escudo devuelto: El ataque ${nombreCarta} de ${lg.usuario} rebotó en ${objetivoUser.usuario}`);
         return;
       }
 
-      const nuevoKarmaObjetivo = (objetivoUser.karma || 0) + (tipo === 'Fuerte' ? 1 : 1);
+      const nuevoKarmaObjetivo = (objetivoUser.karma || 0) + 1;
 
       let expIncremento = 0;
       if (tipo === 'Fuerte') expIncremento = 1;
@@ -1234,7 +1258,7 @@ export default function DesafioPokemonApp() {
 
   const badgeInfo = getBadgeExperiencia(lg?.experiencia || 0);
   const tieneEscudoActivo = (lg?.compras || []).some(
-    (c: string) => c.toLowerCase() === 'escudo protector'
+    (c: string) => c.toLowerCase() === 'escudo protector' || c.toLowerCase() === 'reversa'
   );
 
   if (!lg) {
@@ -1408,10 +1432,10 @@ export default function DesafioPokemonApp() {
                 ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-[0_0_10px_rgba(6,182,212,0.3)]' 
                 : 'bg-slate-800/50 text-slate-400 border-slate-700'
             }`}
-            title={tieneEscudoActivo ? 'Escudo protector activado en tu inventario' : 'Sin escudo protector activo'}
+            title={tieneEscudoActivo ? 'Protección (Escudo o Reversa) activa en tu inventario' : 'Sin protección activa'}
           >
             <span>🛡️</span>
-            <span>{tieneEscudoActivo ? 'ESCUDO ACTIVADO' : 'ESCUDO DESACTIVADO'}</span>
+            <span>{tieneEscudoActivo ? 'PROTECCIÓN ACTIVADA' : 'SIN PROTECCIÓN'}</span>
           </div>
         </div>
 
@@ -1472,12 +1496,12 @@ export default function DesafioPokemonApp() {
                   <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
                     <div className="flex justify-between items-center mb-1">
                       <span className="text-xs font-bold text-yellow-400">
-                        🛡️ Actualización de Reversa y Revivir
+                        🛡️ Actualización de Reversa
                       </span>
                       <span className="text-[10px] text-slate-500">Hoy</span>
                     </div>
                     <p className="text-xs text-slate-300 leading-relaxed">
-                      Se han integrado las reglas de un único uso por Pokémon para Revivir y el rebote automático con obtención de carta para la Reversa.
+                      La carta Reversa funciona de manera automática como escudo protector en tu inventario. Al recibir un ataque, este rebota: el atacante pierde su carta y su karma, y tú ganas el karma y recibes de vuelta la carta que usaron en tu contra.
                     </p>
                   </div>
                 </div>
@@ -1497,9 +1521,9 @@ export default function DesafioPokemonApp() {
                     <span className="font-bold text-yellow-300">{lg.karma} / {lg.experiencia}</span>
                   </div>
                   <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
-                    <span className="text-slate-400">Escudo:</span>
+                    <span className="text-slate-400">Protección:</span>
                     <span className={`font-bold ${tieneEscudoActivo ? 'text-cyan-400' : 'text-slate-500'}`}>
-                      {tieneEscudoActivo ? 'Activado' : 'Desactivado'}
+                      {tieneEscudoActivo ? 'Activa' : 'Inactiva'}
                     </span>
                   </div>
                 </div>
@@ -1844,9 +1868,9 @@ export default function DesafioPokemonApp() {
                 </button>
               </div>
 
-              {/* REINICIAR ESCUDO PROTECTOR */}
+              {/* REINICIAR PROTECCIÓN */}
               <div className="bg-slate-950 p-5 rounded-2xl border border-cyan-500/30 flex flex-col gap-4">
-                <h3 className="text-sm font-bold text-cyan-400">🛡️ Reiniciar Escudo de Jugador</h3>
+                <h3 className="text-sm font-bold text-cyan-400">🛡️ Retirar Protección de Jugador</h3>
                 <label className="text-xs text-slate-400">Seleccionar Participante</label>
                 <select
                   value={adminTargetUser}
@@ -1855,7 +1879,7 @@ export default function DesafioPokemonApp() {
                 >
                   {ps.map((u) => (
                     <option key={u.usuario} value={u.usuario}>
-                      {u.usuario} {(u.compras || []).some((c: string) => c.toLowerCase() === 'escudo protector') ? '(🛡️ Con Escudo)' : '(Sin Escudo)'}
+                      {u.usuario} {(u.compras || []).some((c: string) => c.toLowerCase() === 'escudo protector' || c.toLowerCase() === 'reversa') ? '(🛡️ Protegido)' : '(Sin Protección)'}
                     </option>
                   ))}
                 </select>
@@ -1863,7 +1887,7 @@ export default function DesafioPokemonApp() {
                   onClick={() => adminReiniciarEscudo(adminTargetUser)}
                   className="mt-auto py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-black text-xs rounded-lg transition"
                 >
-                  🛡️ REINICIAR ESCUDO A {adminTargetUser}
+                  🛡️ RETIRAR PROTECCIÓN A {adminTargetUser}
                 </button>
               </div>
 
