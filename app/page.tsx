@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
    CARTAS
 ========================================================= */
 
-const ADMINS = ['Rexitoo', 'alex96', 'Redsam', 'Poke589', 'Faxzer0'];
+const ADMINS = ['Rexitoo', 'alex96', 'Redsam', 'Poke589', 'Faxzer0', 'ikerglz_'];
 const ADMIN_HISTORY_USER = 'Rexitoo,Faxzer0';
 
 const N = [
@@ -1698,8 +1698,8 @@ export default function DesafioPokemonApp() {
                           {p.usuario} 
                           {esAdminParticipante && <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded-full border border-amber-500/30">👑 [Admin]</span>}
                           {p.usuario === lg.usuario && <span className="text-[10px] bg-pink-500/20 text-pink-400 px-2 py-0.5 rounded-full">Tú</span>}
-                          {p.reversaActiva && <span className="text-[9px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded-full">🔄 Reversa</span>}
-                          {p.escudoActivo && <span className="text-[9px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded-full">🛡️ Escudo</span>}
+                          {isAdmin && p.reversaActiva && <span className="text-[9px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded-full">🔄 Reversa (Admin)</span>}
+                          {isAdmin && p.escudoActivo && <span className="text-[9px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded-full">🛡️ Escudo (Admin)</span>}
                         </td>
                         <td className="py-4 px-4 font-bold text-yellow-300">
                           {p.monedas} 🪙
