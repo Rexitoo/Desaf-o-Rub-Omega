@@ -394,8 +394,8 @@ const PT_INICIAL = [
   contrasena: i === 0 ? 'tio123' : u.toLowerCase().replace('_', '') + '123',
   monedas: 20,
   compras: [],
-  escudoActivo: false, // Controla si tiene activado el escudo o reversa manualmente
-  reversaActiva: false, // Controla si la reversa está activada manualmente
+  escudoActivo: false,
+  reversaActiva: false,
   revivirUsados: [],
   ventaIlegalUsados: [],
   ventaIlegalLujoUsados: [],
@@ -673,7 +673,6 @@ export default function DesafioPokemonApp() {
       return;
     }
 
-    // ACTIVAR ESCUDO PROTECTOR MANUALMENTE
     if (nombreCarta.toLowerCase() === 'escudo protector') {
       const cartaEncontrada = comprasActuales.find(
         (c: string) => c.toLowerCase() === nombreCarta.toLowerCase()
@@ -708,7 +707,6 @@ export default function DesafioPokemonApp() {
       return;
     }
 
-    // ACTIVAR REVERSA MANUALMENTE
     if (nombreCarta.toLowerCase() === 'reversa') {
       const cartaEncontrada = comprasActuales.find(
         (c: string) => c.toLowerCase() === nombreCarta.toLowerCase()
@@ -743,7 +741,6 @@ export default function DesafioPokemonApp() {
       return;
     }
 
-    // LÓGICA DE REVIVIR POKÉMON: Solo 1 uso por Pokémon específico
     if (nombreCarta.toLowerCase() === 'revivir pokémon') {
       const cartaEncontrada = comprasActuales.find(
         (c: string) => c.toLowerCase() === nombreCarta.toLowerCase()
@@ -816,25 +813,22 @@ export default function DesafioPokemonApp() {
         return;
       }
 
-      // El defensor SIEMPRE sube 1 nivel de experiencia al ser atacado (tenga o no escudos activos)
       const expPrevioDef = objetivoUser.experiencia || 0;
       const nuevaExpObjetivoBase = Math.min(4, expPrevioDef + 1);
 
-      // Comprobar si el objetivo tiene REVERSA activa
       if (objetivoUser.reversaActiva) {
         const indexPropio = comprasActuales.findIndex(
           (c: string) => c.toLowerCase() === nombreCarta.toLowerCase()
         );
         const nuevasComprasPropias = [...comprasActuales];
-        nuevasComprasPropias.splice(indexPropio, 1); // El atacante pierde su carta
+        nuevasComprasPropias.splice(indexPropio, 1);
 
-        // El defensor se queda con la carta con la que le atacaron
         const comprasDefensorActualizadas = [...(objetivoUser.compras || []), nombreCarta];
 
         let karmaAtacante = lg.karma;
-        if (karmaAtacante > 0) karmaAtacante -= 1; // El atacante pierde su karma
+        if (karmaAtacante > 0) karmaAtacante -= 1;
 
-        const karmaObjetivo = (objetivoUser.karma || 0) + 1; // El defensor gana el karma
+        const karmaObjetivo = (objetivoUser.karma || 0) + 1;
 
         let regaloRoboJusto = false;
         let comprasObjetivoFinal = [...comprasDefensorActualizadas];
@@ -854,7 +848,7 @@ export default function DesafioPokemonApp() {
               ...x,
               karma: karmaObjetivo,
               experiencia: nuevaExpObjetivoBase,
-              reversaActiva: false, // Se consume la reversa
+              reversaActiva: false,
               compras: comprasObjetivoFinal,
               roboJustoCompradoTramo: regaloRoboJusto ? true : x.roboJustoCompradoTramo,
             };
@@ -872,13 +866,12 @@ export default function DesafioPokemonApp() {
         return;
       }
 
-      // Comprobar si el objetivo tiene ESCUDO PROTECTOR activo
       if (objetivoUser.escudoActivo) {
         const indexPropio = comprasActuales.findIndex(
           (c: string) => c.toLowerCase() === nombreCarta.toLowerCase()
         );
         const nuevasComprasPropias = [...comprasActuales];
-        nuevasComprasPropias.splice(indexPropio, 1); // Se consume la carta del atacante
+        nuevasComprasPropias.splice(indexPropio, 1);
 
         let karmaAtacante = lg.karma;
         if (karmaAtacante > 0) karmaAtacante -= 1;
@@ -902,7 +895,7 @@ export default function DesafioPokemonApp() {
               ...x,
               karma: karmaObjetivo,
               experiencia: nuevaExpObjetivoBase,
-              escudoActivo: false, // Se consume el escudo
+              escudoActivo: false,
               compras: comprasObjetivoFinal,
               roboJustoCompradoTramo: regaloRoboJusto ? true : x.roboJustoCompradoTramo,
             };
@@ -1037,11 +1030,10 @@ export default function DesafioPokemonApp() {
       nuevasCompras.splice(index, 1);
 
       const expPrevioDef = objetivoUser.experiencia || 0;
-      const nuevaExpObjetivoBase = Math.min(4, expPrevioDef + 1); // El defensor SIEMPRE sube de nivel al ser atacado
+      const nuevaExpObjetivoBase = Math.min(4, expPrevioDef + 1);
 
-      // SI TIENE REVERSA ACTIVA
       if (objetivoUser.reversaActiva) {
-        const comprasDefensorActualizadas = [...(objetivoUser.compras || []), nombreCarta]; // El defensor se queda con la carta de ataque
+        const comprasDefensorActualizadas = [...(objetivoUser.compras || []), nombreCarta];
         let karmaAtacanteTrasRebote = nuevoKarmaAtacante;
         if (tipo === 'Fuerte' && karmaAtacanteTrasRebote > 0) {
           karmaAtacanteTrasRebote -= 1; 
@@ -1062,7 +1054,7 @@ export default function DesafioPokemonApp() {
             return {
               ...x,
               karma: karmaAtacanteTrasRebote,
-              compras: nuevasCompras, // El atacante se queda sin su carta
+              compras: nuevasCompras,
             };
           }
           if (x.usuario.toLowerCase() === objetivoUser.usuario.toLowerCase()) {
@@ -1087,7 +1079,6 @@ export default function DesafioPokemonApp() {
         return;
       }
 
-      // SI TIENE ESCUDO PROTECTOR ACTIVO
       if (objetivoUser.escudoActivo) {
         let karmaAtacanteTrasEscudo = nuevoKarmaAtacante;
         const karmaObjetivoTrasEscudo = (objetivoUser.karma || 0) + 1;
@@ -1691,10 +1682,22 @@ export default function DesafioPokemonApp() {
                 <tbody className="divide-y divide-slate-800 text-xs">
                   {ps.map((p) => {
                     const bInfo = getBadgeExperiencia(p.experiencia || 0);
+                    const esAdminParticipante = ADMINS.map(a => a.toLowerCase()).includes(p.usuario.toLowerCase());
+                    const esDuenoOCartaPublica = (cName: string) => {
+                      const lower = cName.toLowerCase();
+                      const esSensible = lower.includes('reversa') || lower.includes('escudo');
+                      if (esSensible) {
+                        return p.usuario.toLowerCase() === lg.usuario.toLowerCase() || isAdmin;
+                      }
+                      return true;
+                    };
+
                     return (
                       <tr key={p.usuario} className="hover:bg-slate-950/50 transition">
                         <td className="py-4 px-4 font-black text-white flex items-center gap-2">
-                          {p.usuario} {p.usuario === lg.usuario && <span className="text-[10px] bg-pink-500/20 text-pink-400 px-2 py-0.5 rounded-full">Tú</span>}
+                          {p.usuario} 
+                          {esAdminParticipante && <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded-full border border-amber-500/30">👑 [Admin]</span>}
+                          {p.usuario === lg.usuario && <span className="text-[10px] bg-pink-500/20 text-pink-400 px-2 py-0.5 rounded-full">Tú</span>}
                           {p.reversaActiva && <span className="text-[9px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded-full">🔄 Reversa</span>}
                           {p.escudoActivo && <span className="text-[9px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded-full">🛡️ Escudo</span>}
                         </td>
@@ -1719,26 +1722,42 @@ export default function DesafioPokemonApp() {
                                   }
                                   return true;
                                 })
-                                .map((c: string, idx: number) => (
-                                  <div
-                                    key={idx}
-                                    title={c}
-                                    className="w-10 h-14 bg-slate-950 border border-slate-700 rounded-md overflow-hidden flex items-center justify-center shadow-md hover:scale-110 transition-transform"
-                                  >
-                                    <img
-                                      src={`/${c.toLowerCase().replace(/ /g, '_')}.png`}
-                                      alt={c}
-                                      className="w-full h-full object-contain"
-                                      onError={(e) => {
-                                        const target = e.currentTarget;
-                                        target.style.display = 'none';
-                                        if (target.parentElement) {
-                                          target.parentElement.innerHTML = `<span class="text-[9px] text-center font-bold px-0.5 text-slate-300">${c}</span>`;
-                                        }
-                                      }}
-                                    />
-                                  </div>
-                                ))
+                                .map((c: string, idx: number) => {
+                                  const mostrarReal = esDuenoOCartaPublica(c);
+
+                                  if (!mostrarReal) {
+                                    return (
+                                      <div
+                                        key={idx}
+                                        title="Oculto para proteger estrategia"
+                                        className="px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded-md text-[10px] text-slate-400 italic shadow-md"
+                                      >
+                                        🔒 Oculto
+                                      </div>
+                                    );
+                                  }
+
+                                  return (
+                                    <div
+                                      key={idx}
+                                      title={c}
+                                      className="w-10 h-14 bg-slate-950 border border-slate-700 rounded-md overflow-hidden flex items-center justify-center shadow-md hover:scale-110 transition-transform"
+                                    >
+                                      <img
+                                        src={`/${c.toLowerCase().replace(/ /g, '_')}.png`}
+                                        alt={c}
+                                        className="w-full h-full object-contain"
+                                        onError={(e) => {
+                                          const target = e.currentTarget;
+                                          target.style.display = 'none';
+                                          if (target.parentElement) {
+                                            target.parentElement.innerHTML = `<span class="text-[9px] text-center font-bold px-0.5 text-slate-300">${c}</span>`;
+                                          }
+                                        }}
+                                      />
+                                    </div>
+                                  );
+                                })
                             ) : (
                               <span className="text-slate-500 italic">Ninguno</span>
                             )}
