@@ -406,7 +406,7 @@ const PT_INICIAL = [
     {
       id: 1,
       emisor: 'Admin (Rexitoo)',
-      mensaje: '¡Bienvenido al Desafío Pokémon! Revisa el Historial Global para ver las acciones de todos.',
+      mensaje: '¡Bienvenido al Desafío Pokémon! Revisa el Historial Global en la sección de inicio.',
       fecha: 'Hoy, 10:00',
       leido: false,
     },
@@ -536,7 +536,6 @@ export default function DesafioPokemonApp() {
     setPs(actualizados);
     setLg(actualizados.find((x) => x.usuario === lg.usuario));
     
-    // Registrar en el Historial Global
     registrarHistorialGlobal('COMPRA', `${lg.usuario} compró la carta [${carta.nombre}] por ${precioFinal} monedas.`);
     
     mostrarNotificacion(`Comprado con Éxito\nHas comprado ${carta.nombre}`);
@@ -574,7 +573,6 @@ export default function DesafioPokemonApp() {
       return;
     }
 
-    // ATAQUES Y ROBOS
     if (cartaDef?.cat === 'Ataque' || nombreCarta.toLowerCase() === 'robo de monedas' || nombreCarta.toLowerCase() === 'robo de comodín') {
       if (!ataqueObjetivoUser) { mostrarNotificacion('⚠️ Selecciona un objetivo.'); return; }
       if (ataqueObjetivoUser.toLowerCase() === lg.usuario.toLowerCase()) { mostrarNotificacion('❌ No puedes atacarte a ti mismo.'); return; }
@@ -584,7 +582,6 @@ export default function DesafioPokemonApp() {
       const indexPropio = comprasActuales.findIndex((c: string) => c.toLowerCase() === nombreCarta.toLowerCase());
       if (indexPropio === -1) { mostrarNotificacion('❌ No tienes esta carta en tu inventario.'); return; }
 
-      // Resolver Reversa
       if (objetivoUser.reversaActiva) {
         const nuevasComprasPropias = [...comprasActuales]; nuevasComprasPropias.splice(indexPropio, 1);
         const comprasDefensor = [...(objetivoUser.compras || []), nombreCarta];
@@ -604,7 +601,6 @@ export default function DesafioPokemonApp() {
         return;
       }
 
-      // Resolver Escudo
       if (objetivoUser.escudoActivo) {
         const nuevasComprasPropias = [...comprasActuales]; nuevasComprasPropias.splice(indexPropio, 1);
 
@@ -623,7 +619,6 @@ export default function DesafioPokemonApp() {
         return;
       }
 
-      // Ataque exitoso
       const nuevasComprasPropias = [...comprasActuales]; nuevasComprasPropias.splice(indexPropio, 1);
       
       const actualizados = ps.map((x) => {
@@ -675,7 +670,6 @@ export default function DesafioPokemonApp() {
             {[
               { id: 'INICIO', label: 'INICIO', icon: '🏠' },
               { id: 'PARTICIPANTES', label: 'PARTICIPANTES', icon: '👥' },
-              { id: 'HISTORIAL_GLOBAL', label: '📜 HISTORIAL GLOBAL', icon: '📜' },
               { id: 'COMODINES', label: 'COMODINES', icon: '🎴' },
               { id: 'BUZÓN', label: 'BUZÓN', icon: '📬' },
             ].map((item) => (
@@ -702,38 +696,36 @@ export default function DesafioPokemonApp() {
       {/* MAIN */}
       <main className="flex-1 bg-gradient-to-br from-[#4a0043] via-[#240022] to-[#120015] p-6 overflow-y-auto flex flex-col items-center relative">
         
-        {/* SECCIÓN HISTORIAL GLOBAL (VISIBLE PARA TODOS) */}
-        {seccionActual === 'HISTORIAL_GLOBAL' && (
-          <div className="w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl">
-            <h2 className="text-xl font-black text-pink-400 border-b border-slate-800 pb-3 mb-6 flex items-center gap-2">
-              📜 Historial Global de la Partida (Todos los participantes)
-            </h2>
-            <div className="flex flex-col gap-3 max-h-[70vh] overflow-y-auto pr-2">
-              {historialGlobal.map((h: any) => (
-                <div key={h.id} className="bg-slate-950 border border-slate-800 p-3.5 rounded-xl flex items-start justify-between gap-4 text-xs">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[10px] bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded uppercase font-bold">{h.tipo}</span>
-                      <span className="text-[10px] text-slate-500">{h.fecha}</span>
-                    </div>
-                    <p className="text-slate-200 font-medium">{h.descripcion}</p>
-                  </div>
-                </div>
-              ))}
-              {historialGlobal.length === 0 && (
-                <div className="text-center py-12 text-slate-500 text-xs">
-                  Aún no hay registros en el historial global. ¡Realiza compras o ataques para verlos aquí!
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
         {seccionActual === 'INICIO' && (
-          <div className="w-full max-w-5xl flex flex-col gap-6">
+          <div className="w-full max-w-4xl flex flex-col gap-6">
             <div className="bg-white/10 p-6 rounded-3xl border border-white/10">
               <h1 className="text-xl font-black text-white">¡Hola, {lg.usuario}! 👋</h1>
-              <p className="text-xs text-pink-200 mt-1">Dirígete a la sección <span className="font-bold text-white">"HISTORIAL GLOBAL"</span> en el menú para ver qué cartas compran los demás, quién ataca a quién y cómo se resuelven los combates.</p>
+              <p className="text-xs text-pink-200 mt-1">Aquí abajo puedes ver el historial global con las acciones, compras y ataques de todos los participantes del servidor en tiempo real.</p>
+            </div>
+
+            {/* HISTORIAL GLOBAL INTEGRADO EN INICIO */}
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl">
+              <h2 className="text-lg font-black text-pink-400 border-b border-slate-800 pb-3 mb-4 flex items-center gap-2">
+                📜 Historial Global de la Partida
+              </h2>
+              <div className="flex flex-col gap-3 max-h-[55vh] overflow-y-auto pr-2">
+                {historialGlobal.map((h: any) => (
+                  <div key={h.id} className="bg-slate-950 border border-slate-800 p-3.5 rounded-xl flex items-start justify-between gap-4 text-xs">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[10px] bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded uppercase font-bold">{h.tipo}</span>
+                        <span className="text-[10px] text-slate-500">{h.fecha}</span>
+                      </div>
+                      <p className="text-slate-200 font-medium">{h.descripcion}</p>
+                    </div>
+                  </div>
+                ))}
+                {historialGlobal.length === 0 && (
+                  <div className="text-center py-12 text-slate-500 text-xs">
+                    Aún no hay registros en el historial global. ¡Realiza compras o ataques para verlos aquí!
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
