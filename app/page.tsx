@@ -826,6 +826,15 @@ export default function DesafioPokemonApp() {
         }
       }
 
+      // Mensaje al buzón del objetivo por robo de comodín
+      const mensajeRoboComodin = {
+        id: Date.now(),
+        emisor: `Sistema / ${lg.usuario}`,
+        mensaje: `¡Te han atacado! El usuario ${lg.usuario} ha utilizado la carta "${nombreCarta}" y te ha robado el comodín "${comodinRobarSeleccionado}".`,
+        fecha: 'Ahora',
+        leido: false,
+      };
+
       const actualizados = ps.map((x) => {
         if (x.usuario === lg.usuario) {
           return {
@@ -841,6 +850,7 @@ export default function DesafioPokemonApp() {
             karma: nuevoKarmaObjetivo,
             compras: comprasObjetivoFinal,
             roboJustoCompradoTramo: regaloRoboJusto ? true : x.roboJustoCompradoTramo,
+            buzon: [mensajeRoboComodin, ...(x.buzon || [])],
           };
         }
         return x;
@@ -928,12 +938,22 @@ export default function DesafioPokemonApp() {
           nuevoKarmaAtacanteTrasRebote -= 1;
         }
 
+        // Mensaje al buzón del atacante avisando que rebotó
+        const mensajeReboteParaAtacante = {
+          id: Date.now(),
+          emisor: `Sistema (${objetivoUser.usuario})`,
+          mensaje: `¡Tu ataque con "${nombreCarta}" ha sido repelido! ${objetivoUser.usuario} tenía un Escudo protector activo y el ataque ha vuelto a ti.`,
+          fecha: 'Ahora',
+          leido: false,
+        };
+
         const actualizados = ps.map((x) => {
           if (x.usuario === lg.usuario) {
             return {
               ...x,
               karma: nuevoKarmaAtacanteTrasRebote,
               compras: comprasAtacanteActualizadas,
+              buzon: [mensajeReboteParaAtacante, ...(x.buzon || [])],
             };
           }
           if (x.usuario.toLowerCase() === objetivoUser.usuario.toLowerCase()) {
@@ -973,6 +993,15 @@ export default function DesafioPokemonApp() {
         }
       }
 
+      // Mensaje de ataque exitoso al buzón del objetivo
+      const nuevoMensajeBuzon = {
+        id: Date.now(),
+        emisor: `Sistema / ${lg.usuario}`,
+        mensaje: `¡Te han atacado! El usuario ${lg.usuario} ha utilizado la carta "${nombreCarta}" en tu contra.`,
+        fecha: 'Ahora',
+        leido: false,
+      };
+
       const actualizados = ps.map((x) => {
         if (x.usuario === lg.usuario) {
           return {
@@ -990,6 +1019,7 @@ export default function DesafioPokemonApp() {
             compras: comprasObjetivo,
             roboJustoCompradoTramo: regaloRoboJusto ? true : x.roboJustoCompradoTramo,
             monedas: sumarMonedasRobo ? Math.max(0, (x.monedas || 0) - 5) : x.monedas,
+            buzon: [nuevoMensajeBuzon, ...(x.buzon || [])],
           };
         }
         return x;
