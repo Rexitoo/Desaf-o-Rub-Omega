@@ -679,9 +679,9 @@ export default function DesafioPokemonApp() {
       return;
     }
 
-    // LÓGICA DE REVERSA: Se mantiene en el inventario como protección activa (no requiere dar clic en "Usar" para activarse, o se puede dejar en inventario como escudo).
+    // LÓGICA DE REVERSA: Se queda en el inventario como escudo protector automático.
     if (nombreCarta.toLowerCase() === 'reversa') {
-      mostrarNotificacion('🔄 La Reversa funciona automáticamente como escudo protector en tu inventario. ¡Cuando te ataquen, rebotará de inmediato contra el atacante!');
+      mostrarNotificacion('🔄 La Reversa funciona automáticamente como escudo protector en tu inventario. ¡Cuando te ataquen, rebotará de inmediato contra el atacante sin darte ningún escudo extra!');
       return;
     }
 
@@ -760,12 +760,12 @@ export default function DesafioPokemonApp() {
 
       // Comprobar si el objetivo tiene Escudo protector o Reversa
       const comprasObjetivoCheck = objetivoUser.compras || [];
-      const tieneEscudoOReversaObj = comprasObjetivoCheck.some(
-        (c: string) => c.toLowerCase() === 'escudo protector' || c.toLowerCase() === 'reversa'
-      );
+      const tieneReversaObj = comprasObjetivoCheck.some((c: string) => c.toLowerCase() === 'reversa');
+      const tieneEscudoObj = comprasObjetivoCheck.some((c: string) => c.toLowerCase() === 'escudo protector');
+      const tieneProteccionObj = tieneReversaObj || tieneEscudoObj;
 
-      if (tieneEscudoOReversaObj) {
-        const tipoProteccion = comprasObjetivoCheck.some((c: string) => c.toLowerCase() === 'reversa') ? 'Reversa' : 'Escudo protector';
+      if (tieneProteccionObj) {
+        const tipoProteccion = tieneReversaObj ? 'Reversa' : 'Escudo protector';
         const indexProteccion = comprasObjetivoCheck.findIndex(
           (c: string) => c.toLowerCase() === tipoProteccion.toLowerCase()
         );
@@ -777,7 +777,7 @@ export default function DesafioPokemonApp() {
         );
         const nuevasComprasPropias = [...comprasActuales];
         nuevasComprasPropias.splice(indexPropio, 1);
-        nuevasComprasPropias.push(nombreCarta); // Recibe de vuelta su carta de ataque
+        nuevasComprasPropias.push(nombreCarta); // Recibe de vuelta su carta de ataque exacta
 
         let karmaAtacante = lg.karma;
         if (karmaAtacante > 0) karmaAtacante -= 1; // El atacante pierde su karma
@@ -799,7 +799,7 @@ export default function DesafioPokemonApp() {
         setAtaqueObjetivoUser('');
         setComodinRobarSeleccionado('');
         setCartaModal(null);
-        mostrarNotificacion(`🔄 ¡${tipoProteccion} activado! El ataque rebotó: ${lg.usuario} pierde 1 de karma, recupera su carta "${nombreCarta}" y ${objetivoUser.usuario} gana el karma.`);
+        mostrarNotificacion(`🔄 ¡${tipoProteccion} activado! El ataque rebotó: ${lg.usuario} pierde 1 de karma, recupera su carta "${nombreCarta}" y ${objetivoUser.usuario} gana el karma (sin generar cartas extra).`);
         registrarHistorialAdmin(`Reversa/Escudo devuelto: ${nombreCarta} de ${lg.usuario} rebotó en ${objetivoUser.usuario}`);
         return;
       }
@@ -909,9 +909,9 @@ export default function DesafioPokemonApp() {
 
       // COMPROBAR SI TIENE ESCUDO PROTECTOR O REVERSA
       const comprasObjetivoCheck = objetivoUser.compras || [];
-      const tieneProteccion = comprasObjetivoCheck.some(
-        (c: string) => c.toLowerCase() === 'escudo protector' || c.toLowerCase() === 'reversa'
-      );
+      const tieneReversaObj = comprasObjetivoCheck.some((c: string) => c.toLowerCase() === 'reversa');
+      const tieneEscudoObj = comprasObjetivoCheck.some((c: string) => c.toLowerCase() === 'escudo protector');
+      const tieneProteccion = tieneReversaObj || tieneEscudoObj;
 
       const tipo = cartaDef?.tipoAtaque || (nombreCarta.toLowerCase() === 'robo de monedas' ? 'Especial' : 'Fuerte');
       
@@ -930,9 +930,9 @@ export default function DesafioPokemonApp() {
       const nuevasCompras = [...comprasActuales];
       nuevasCompras.splice(index, 1);
 
-      // SI TIENE PROTECCIÓN (ESCUDO O REVERSA): El ataque rebota
+      // SI TIENE PROTECCIÓN (ESCUDO O REVERSA): El ataque rebota limpiamente
       if (tieneProteccion) {
-        const tipoProteccionUsada = comprasObjetivoCheck.some((c: string) => c.toLowerCase() === 'reversa') ? 'Reversa' : 'Escudo protector';
+        const tipoProteccionUsada = tieneReversaObj ? 'Reversa' : 'Escudo protector';
         const comprasObjetivoLimpias = [...comprasObjetivoCheck];
         const indexProt = comprasObjetivoLimpias.findIndex(
           (c: string) => c.toLowerCase() === tipoProteccionUsada.toLowerCase()
@@ -941,12 +941,12 @@ export default function DesafioPokemonApp() {
           comprasObjetivoLimpias.splice(indexProt, 1);
         }
 
-        // El atacante pierde su carta de ataque pero RECIBE DE VUELTA la carta exacta que usó, y pierde 1 de karma adicional si era fuerte (o el karma del rebote)
+        // El atacante pierde su carta de ataque pero RECIBE DE VUELTA la carta exacta que usó
         const comprasAtacanteActualizadas = [...nuevasCompras, nombreCarta]; 
 
         let nuevoKarmaAtacanteTrasRebote = nuevoKarmaAtacante;
         if (tipo === 'Fuerte' && nuevoKarmaAtacante > 0) {
-          nuevoKarmaAtacanteTrasRebote -= 1; // Pierde karma por el ataque fallido/rebotado
+          nuevoKarmaAtacanteTrasRebote -= 1; 
         }
 
         const karmaObjetivoTrasRebote = (objetivoUser.karma || 0) + 1; // El defensor gana ese karma
@@ -973,7 +973,7 @@ export default function DesafioPokemonApp() {
         setLg(actualizados.find((x) => x.usuario === lg.usuario));
         setAtaqueObjetivoUser('');
         setCartaModal(null);
-        mostrarNotificacion(`🔄 ¡${tipoProteccionUsada} activado! El ataque rebotó: ${lg.usuario} pierde karma, recupera su carta "${nombreCarta}" en el inventario y ${objetivoUser.usuario} gana el karma.`);
+        mostrarNotificacion(`🔄 ¡${tipoProteccionUsada} activado! El ataque rebotó: recuperas tu carta "${nombreCarta}" en el inventario, pierdes karma y ${objetivoUser.usuario} gana el karma (sin darte ningún escudo extra).`);
         registrarHistorialAdmin(`Reversa/Escudo devuelto: El ataque ${nombreCarta} de ${lg.usuario} rebotó en ${objetivoUser.usuario}`);
         return;
       }
@@ -1501,7 +1501,7 @@ export default function DesafioPokemonApp() {
                       <span className="text-[10px] text-slate-500">Hoy</span>
                     </div>
                     <p className="text-xs text-slate-300 leading-relaxed">
-                      La carta Reversa funciona de manera automática como escudo protector en tu inventario. Al recibir un ataque, este rebota: el atacante pierde su carta y su karma, y tú ganas el karma y recibes de vuelta la carta que usaron en tu contra.
+                      La Reversa actúa por sí misma como escudo automático. Al recibir un ataque, este rebota de inmediato: el atacante pierde su carta y su karma, tú ganas el karma y recibes la carta exacta que usaron en tu contra, sin otorgar ningún escudo protector extra.
                     </p>
                   </div>
                 </div>
