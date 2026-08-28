@@ -1,6 +1,24 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { initializeApp, getApps } from 'firebase/app';
+import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
+
+/* =========================================================
+   CONFIGURACIÓN DE FIREBASE
+========================================================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyDTT0wYLrGXvLPnvPb267nUzGDbBJd5JYg",
+  authDomain: "web-comodines.firebaseapp.com",
+  projectId: "web-comodines",
+  storageBucket: "web-comodines.firebasestorage.app",
+  messagingSenderId: "42875578963",
+  appId: "1:42875578963:web:02da9867ea5670e215b4a6",
+  measurementId: "G-5MCP8P8B27"
+};
+
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
+const db = getFirestore(app);
 
 /* =========================================================
    CARTAS
@@ -361,7 +379,7 @@ const CARTAS = N.map((x, i) => ({
 }));
 
 /* =========================================================
-   PARTICIPANTES
+   PARTICIPANTES (DATOS INICIALES PARA FIRESTORE)
 ========================================================= */
 
 const PT_INICIAL = [
@@ -426,19 +444,8 @@ const PT_INICIAL = [
 ========================================================= */
 
 export default function DesafioPokemonApp() {
-  const [ps, setPs] = useState<any[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('desafio_pokemon_ps');
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch {
-          return PT_INICIAL;
-        }
-      }
-    }
-    return PT_INICIAL;
-  });
+  const [ps, setPs] = useState<any[]>([]);
+  const [loadingFirebase, setLoadingFirebase] = useState(true);
 
   const [lg, setLg] = useState<any>(null);
   const [inputUser, setInputUser] = useState('');
@@ -486,11 +493,41 @@ export default function DesafioPokemonApp() {
 
   const isAdmin = ADMINS.map(a => a.toLowerCase()).includes(lg?.usuario?.toLowerCase() || '');
 
+  // SINCRONIZACIÓN EN TIEMPO REAL CON FIRESTORE
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('desafio_pokemon_ps', JSON.stringify(ps));
-    }
-  }, [ps]);
+    const docRef = doc(db, 'config', 'participantes');
+    
+    // Verificamos si existe el documento en Firestore, si no, lo inicializamos
+    getDoc(docRef).then((snapshot) => {
+      if (!snapshot.exists()) {
+        setDoc(docRef, { lista: PT_INICIAL });
+      }
+    });
+
+    // Escuchamos cambios en vivo
+    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data().lista;
+        setPs(data);
+        
+        // Si hay una sesión iniciada, actualizamos sus datos en vivo
+        if (lg) {
+          const usuarioActualizado = data.find((u: any) => u.usuario.toLowerCase() === lg.usuario.toLowerCase());
+          if (usuarioActualizado) setLg(usuarioActualizado);
+        }
+      }
+      setLoadingFirebase(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Función para guardar cambios en Firestore y actualizar en tiempo real a todos
+  const actualizarBaseDatos = async (nuevosPs: any[]) => {
+    setPs(nuevosPs);
+    const docRef = doc(db, 'config', 'participantes');
+    await setDoc(docRef, { lista: nuevosPs });
+  };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -523,24 +560,22 @@ export default function DesafioPokemonApp() {
     }, 4000);
   };
 
-  const reiniciarTodo = () => {
+  const reiniciarTodo = async () => {
     if (!isAdmin) return;
     const confirmar = window.confirm(
-      '¿Estás seguro de que quieres reiniciar todo el desafío? Se borrarán los datos guardados y se restablecerá el sistema.'
+      '¿Estás seguro de que quieres reiniciar todo el desafío en Firebase? Se restablecerá el sistema para todos.'
     );
     if (!confirmar) return;
 
-    localStorage.removeItem('desafio_pokemon_ps');
-    localStorage.removeItem('desafio_admin_history');
-
-    setPs(PT_INICIAL);
+    await actualizarBaseDatos(PT_INICIAL);
     setLg(PT_INICIAL.find((u) => u.usuario.toLowerCase() === lg?.usuario?.toLowerCase()) || PT_INICIAL[0]);
+    localStorage.removeItem('desafio_admin_history');
     setAdminHistory([]);
     
-    mostrarNotificacion('🔄 ¡Se ha reiniciado todo el sistema con éxito!');
+    mostrarNotificacion('🔄 ¡Se ha reiniciado todo el sistema en Firebase con éxito!');
   };
 
-  const adminReiniciarKarmaYExp = () => {
+  const adminReiniciarKarmaYExp = async () => {
     if (!isAdmin) return;
     const confirmar = window.confirm(
       '¿Deseas restablecer el Karma a 1 y la Experiencia a 0 para todos los participantes?'
@@ -556,13 +591,12 @@ export default function DesafioPokemonApp() {
       roboJustoCompradoTramo: false,
     }));
 
-    setPs(actualizados);
-    setLg(actualizados.find((x) => x.usuario === lg.usuario));
+    await actualizarBaseDatos(actualizados);
     mostrarNotificacion('⚡ ¡Karma y Experiencia restablecidos por el Admin!');
     registrarHistorialAdmin('Admin restableció Karma y EXP de todos los usuarios.');
   };
 
-  const adminReiniciarEscudo = (usuarioObjetivo: string) => {
+  const adminReiniciarEscudo = async (usuarioObjetivo: string) => {
     if (!isAdmin) return;
     
     const objetivoUser = ps.find((x) => x.usuario.toLowerCase() === usuarioObjetivo.toLowerCase());
@@ -578,11 +612,7 @@ export default function DesafioPokemonApp() {
       return x;
     });
 
-    setPs(actualizados);
-    if (lg.usuario === objetivoUser.usuario) {
-      setLg(actualizados.find((x) => x.usuario === lg.usuario));
-    }
-
+    await actualizarBaseDatos(actualizados);
     mostrarNotificacion(`🛡️ ¡Se ha retirado la protección activa de ${objetivoUser.usuario}!`);
     registrarHistorialAdmin(`Admin retiró la protección activa de ${objetivoUser.usuario}`);
   };
@@ -592,7 +622,7 @@ export default function DesafioPokemonApp() {
     return 3;
   };
 
-  const comprar = (carta: any) => {
+  const comprar = async (carta: any) => {
     if (carta.infinito || carta.soloUso) {
       mostrarNotificacion('🔒 Este comodín no se puede comprar.');
       return;
@@ -633,8 +663,7 @@ export default function DesafioPokemonApp() {
       return x;
     });
 
-    setPs(actualizados);
-    setLg(actualizados.find((x) => x.usuario === lg.usuario));
+    await actualizarBaseDatos(actualizados);
     mostrarNotificacion(`Comprado con Éxito\nHas comprado ${carta.nombre} x1 (Recuerda que debes darle a USAR para activarlo)`);
     registrarHistorialAdmin(`Compra: ${carta.nombre}`);
   };
@@ -653,7 +682,7 @@ export default function DesafioPokemonApp() {
 
   const CARTAS_INFINITAS = new Set(['Venta Ilegal', 'Venta ilegal de lujo']);
 
-  const usarCarta = (nombreCarta: string) => {
+  const usarCarta = async (nombreCarta: string) => {
     const comprasActuales = lg.compras || [];
     const cartaDef = CARTAS.find((c) => c.nombre.toLowerCase() === nombreCarta.toLowerCase());
 
@@ -665,8 +694,7 @@ export default function DesafioPokemonApp() {
         return x;
       });
 
-      setPs(actualizados);
-      setLg(actualizados.find((x) => x.usuario === lg.usuario));
+      await actualizarBaseDatos(actualizados);
       setVentaIlegalObjetivo('');
       setCartaModal(null);
       mostrarNotificacion(`💰 ${nombreCarta} usada. Has recibido 2 monedas.`);
@@ -699,8 +727,7 @@ export default function DesafioPokemonApp() {
         return x;
       });
 
-      setPs(actualizados);
-      setLg(actualizados.find((x) => x.usuario === lg.usuario));
+      await actualizarBaseDatos(actualizados);
       setCartaModal(null);
       mostrarNotificacion('🛡️ ¡Escudo protector activado con éxito! Se mantendrá activo hasta recibir un ataque.');
       registrarHistorialAdmin(`Activación: ${lg.usuario} activó Escudo protector`);
@@ -733,8 +760,7 @@ export default function DesafioPokemonApp() {
         return x;
       });
 
-      setPs(actualizados);
-      setLg(actualizados.find((x) => x.usuario === lg.usuario));
+      await actualizarBaseDatos(actualizados);
       setCartaModal(null);
       mostrarNotificacion('🔄 ¡Reversa activada con éxito! Al recibir un ataque, rebotará, te quedarás con la carta del atacante y este se quedará sin ella.');
       registrarHistorialAdmin(`Activación: ${lg.usuario} activó Reversa`);
@@ -778,8 +804,7 @@ export default function DesafioPokemonApp() {
         return x;
       });
 
-      setPs(actualizados);
-      setLg(actualizados.find((x) => x.usuario === lg.usuario));
+      await actualizarBaseDatos(actualizados);
       setRevivirPokemonInput('');
       setCartaModal(null);
       mostrarNotificacion(`✨ ¡Has revivido con éxito a tu Pokémon: ${revivirPokemonInput.trim()}!`);
@@ -856,8 +881,7 @@ export default function DesafioPokemonApp() {
           return x;
         });
 
-        setPs(actualizados);
-        setLg(actualizados.find((x) => x.usuario === lg.usuario));
+        await actualizarBaseDatos(actualizados);
         setAtaqueObjetivoUser('');
         setComodinRobarSeleccionado('');
         setCartaModal(null);
@@ -903,8 +927,7 @@ export default function DesafioPokemonApp() {
           return x;
         });
 
-        setPs(actualizados);
-        setLg(actualizados.find((x) => x.usuario === lg.usuario));
+        await actualizarBaseDatos(actualizados);
         setAtaqueObjetivoUser('');
         setComodinRobarSeleccionado('');
         setCartaModal(null);
@@ -968,8 +991,7 @@ export default function DesafioPokemonApp() {
         return x;
       });
 
-      setPs(actualizados);
-      setLg(actualizados.find((x) => x.usuario === lg.usuario));
+      await actualizarBaseDatos(actualizados);
       setAtaqueObjetivoUser('');
       setComodinRobarSeleccionado('');
       setCartaModal(null);
@@ -1070,8 +1092,7 @@ export default function DesafioPokemonApp() {
           return x;
         });
 
-        setPs(actualizados);
-        setLg(actualizados.find((x) => x.usuario === lg.usuario));
+        await actualizarBaseDatos(actualizados);
         setAtaqueObjetivoUser('');
         setCartaModal(null);
         mostrarNotificacion(`🔄 ¡Reversa activada! El ataque rebotó: pierdes tu carta "${nombreCarta}" y se la queda ${objetivoUser.usuario}. A ${objetivoUser.usuario} le sube 1 nivel de experiencia.`);
@@ -1113,8 +1134,7 @@ export default function DesafioPokemonApp() {
           return x;
         });
 
-        setPs(actualizados);
-        setLg(actualizados.find((x) => x.usuario === lg.usuario));
+        await actualizarBaseDatos(actualizados);
         setAtaqueObjetivoUser('');
         setCartaModal(null);
         mostrarNotificacion(`🛡️ ¡Escudo protector activado! El ataque fue bloqueado, pero a ${objetivoUser.usuario} le sube 1 nivel de experiencia.`);
@@ -1164,8 +1184,7 @@ export default function DesafioPokemonApp() {
         });
       }
 
-      setPs(finalActualizados);
-      setLg(finalActualizados.find((x) => x.usuario === lg.usuario));
+      await actualizarBaseDatos(finalActualizados);
       setAtaqueObjetivoUser('');
       setCartaModal(null);
       mostrarNotificacion(`⚔️ Ataque exitoso (${tipo}) contra ${objetivoUser.usuario}. A ${objetivoUser.usuario} le sube 1 nivel de experiencia.`);
@@ -1207,8 +1226,7 @@ export default function DesafioPokemonApp() {
         return x;
       });
 
-      setPs(actualizados);
-      setLg(actualizados.find((x) => x.usuario === lg.usuario));
+      await actualizarBaseDatos(actualizados);
       setCartaModal(null);
       mostrarNotificacion(`🪙 Has recibido ${cantidad} moneda${cantidad === 1 ? '' : 's'}.`);
       return;
@@ -1242,8 +1260,7 @@ export default function DesafioPokemonApp() {
         return x;
       });
 
-      setPs(actualizados);
-      setLg(actualizados.find((x) => x.usuario === lg.usuario));
+      await actualizarBaseDatos(actualizados);
       setCartaModal(null);
       mostrarNotificacion(`🪙 Monedero perdido: has encontrado ${cantidad} monedas.`);
       return;
@@ -1262,8 +1279,7 @@ export default function DesafioPokemonApp() {
       return x;
     });
 
-    setPs(actualizados);
-    setLg(actualizados.find((x) => x.usuario === lg.usuario));
+    await actualizarBaseDatos(actualizados);
     mostrarNotificacion(`Has usado la carta ${nombreCarta}`);
     registrarHistorialAdmin(`Uso: ${nombreCarta}`);
 
@@ -1272,7 +1288,7 @@ export default function DesafioPokemonApp() {
     }
   };
 
-  const marcarMensajeLeido = (msgId: number) => {
+  const marcarMensajeLeido = async (msgId: number) => {
     const actualizados = ps.map((x) => {
       if (x.usuario === lg.usuario) {
         return {
@@ -1285,11 +1301,10 @@ export default function DesafioPokemonApp() {
       return x;
     });
 
-    setPs(actualizados);
-    setLg(actualizados.find((x) => x.usuario === lg.usuario));
+    await actualizarBaseDatos(actualizados);
   };
 
-  const eliminarMensaje = (msgId: number) => {
+  const eliminarMensaje = async (msgId: number) => {
     const actualizados = ps.map((x) => {
       if (x.usuario === lg.usuario) {
         return {
@@ -1300,11 +1315,10 @@ export default function DesafioPokemonApp() {
       return x;
     });
 
-    setPs(actualizados);
-    setLg(actualizados.find((x) => x.usuario === lg.usuario));
+    await actualizarBaseDatos(actualizados);
   };
 
-  const adminModificarMonedas = (sumar: boolean) => {
+  const adminModificarMonedas = async (sumar: boolean) => {
     if (adminAmount <= 0) {
       mostrarNotificacion('⚠️ Introduce una cantidad válida');
       return;
@@ -1318,14 +1332,11 @@ export default function DesafioPokemonApp() {
       return x;
     });
 
-    setPs(actualizados);
-    if (lg.usuario === adminTargetUser) {
-      setLg(actualizados.find((x) => x.usuario === lg.usuario));
-    }
+    await actualizarBaseDatos(actualizados);
     mostrarNotificacion(`Monedas actualizadas para ${adminTargetUser}`);
   };
 
-  const adminOtorgarCarta = () => {
+  const adminOtorgarCarta = async () => {
     const actualizados = ps.map((x) => {
       if (x.usuario === adminTargetUser) {
         return { ...x, compras: [...(x.compras || []), adminCartaSel] };
@@ -1333,14 +1344,11 @@ export default function DesafioPokemonApp() {
       return x;
     });
 
-    setPs(actualizados);
-    if (lg.usuario === adminTargetUser) {
-      setLg(actualizados.find((x) => x.usuario === lg.usuario));
-    }
+    await actualizarBaseDatos(actualizados);
     mostrarNotificacion(`Carta "${adminCartaSel}" entregada a ${adminTargetUser} (Recuerda que debe darle a USAR para activarla)`);
   };
 
-  const adminEnviarMensaje = () => {
+  const adminEnviarMensaje = async () => {
     if (!adminMsgText.trim()) {
       mostrarNotificacion('⚠️ Escribe un mensaje primero');
       return;
@@ -1361,10 +1369,7 @@ export default function DesafioPokemonApp() {
       return x;
     });
 
-    setPs(actualizados);
-    if (lg.usuario === adminTargetUser) {
-      setLg(actualizados.find((x) => x.usuario === lg.usuario));
-    }
+    await actualizarBaseDatos(actualizados);
     setAdminMsgText('');
     mostrarNotificacion(`Mensaje enviado a ${adminTargetUser}`);
   };
@@ -1392,6 +1397,17 @@ export default function DesafioPokemonApp() {
   };
 
   const badgeInfo = getBadgeExperiencia(lg?.experiencia || 0);
+
+  if (loadingFirebase) {
+    return (
+      <div className="flex h-screen w-screen bg-[#2a0028] items-center justify-center text-white font-sans">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-xs font-bold tracking-widest uppercase">Conectando con Firebase...</span>
+        </div>
+      </div>
+    );
+  }
 
   if (!lg) {
     return (
@@ -1607,7 +1623,7 @@ export default function DesafioPokemonApp() {
               <div>
                 <h1 className="text-xl font-black text-white">¡Hola, {lg.usuario}! 👋</h1>
                 <p className="text-xs text-pink-200">
-                  Bienvenido al Panel Oficial del Desafío Pokémon.
+                  Bienvenido al Panel Oficial del Desafío Pokémon con Firebase en Vivo.
                 </p>
               </div>
               <div className="bg-black/40 backdrop-blur-md border border-yellow-500/30 px-4 py-2 rounded-2xl flex items-center gap-2 shadow-lg">
@@ -1667,7 +1683,7 @@ export default function DesafioPokemonApp() {
         {seccionActual === 'PARTICIPANTES' && (
           <div className="w-full max-w-5xl bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl">
             <h2 className="text-xl font-black text-pink-400 border-b border-slate-800 pb-3 mb-6 flex items-center gap-2">
-              👥 Panel de Participantes (En Vivo)
+              👥 Panel de Participantes (En Vivo con Firebase)
             </h2>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
@@ -2069,7 +2085,7 @@ export default function DesafioPokemonApp() {
               <div className="md:col-span-2 bg-red-950/30 border border-red-500/30 p-5 rounded-2xl flex flex-col gap-3">
                 <h3 className="text-sm font-bold text-red-400">⚠️ Zona de Peligro / Reinicio Total</h3>
                 <p className="text-xs text-slate-400">
-                  Esta acción restablecerá por completo las monedas, comodines y datos de todos los participantes a sus valores iniciales.
+                  Esta acción restablecerá por completo las monedas, comodines y datos de todos los participantes en Firebase.
                 </p>
                 <button
                   onClick={reiniciarTodo}
@@ -2322,3 +2338,7 @@ export default function DesafioPokemonApp() {
     </div>
   );
 }
+                                                                                 
+                                                   
+                    
+                                                
