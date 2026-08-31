@@ -3,22 +3,29 @@
 import { useEffect, useState } from 'react';
 import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
+import { getAnalytics } from 'firebase/analytics';
 
 /* =========================================================
-   CONFIGURACIÓN DE FIREBASE
+   CONFIGURACIÓN DE FIREBASE (NUEVA)
 ========================================================= */
 const firebaseConfig = {
-  apiKey: "AIzaSyDTT0wYLrGXvLPnvPb267nUzGDbBJd5JYg",
-  authDomain: "web-comodines.firebaseapp.com",
-  projectId: "web-comodines",
-  storageBucket: "web-comodines.firebasestorage.app",
-  messagingSenderId: "42875578963",
-  appId: "1:42875578963:web:02da9867ea5670e215b4a6",
-  measurementId: "G-5MCP8P8B27"
+  apiKey: "AIzaSyAbHqvckq9EoV9Gi4K_FhktuYX-Hv0WmQA",
+  authDomain: "web-comodines-df813.firebaseapp.com",
+  projectId: "web-comodines-df813",
+  storageBucket: "web-comodines-df813.firebasestorage.app",
+  messagingSenderId: "945397005505",
+  appId: "1:945397005505:web:4ec508b9089d8d3fcd6840",
+  measurementId: "G-KYRBSMCTWZ"
 };
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
 const db = getFirestore(app);
+
+// Opcional: inicializar analytics solo en el navegador para evitar errores de SSR en Next.js
+let analytics;
+if (typeof window !== 'undefined') {
+  analytics = getAnalytics(app);
+}
 
 /* =========================================================
    CARTAS
@@ -665,7 +672,7 @@ export default function DesafioPokemonApp() {
 
     await actualizarBaseDatos(actualizados);
     mostrarNotificacion(`Comprado con Éxito\nHas comprado ${carta.nombre} x1 (Recuerda que debes darle a USAR para activarlo)`);
-    registrarHistorialAdmin(`Compra: ${carta.nombre}`);
+   registrarHistorialAdmin(`Compra: ${carta.nombre}`);
   };
 
   const CARTAS_MONEDAS: Record<string, number> = {
@@ -1133,8 +1140,7 @@ export default function DesafioPokemonApp() {
           }
           return x;
         });
-
-        await actualizarBaseDatos(actualizados);
+         await actualizarBaseDatos(actualizados);
         setAtaqueObjetivoUser('');
         setCartaModal(null);
         mostrarNotificacion(`🛡️ ¡Escudo protector activado! El ataque fue bloqueado, pero a ${objetivoUser.usuario} le sube 1 nivel de experiencia.`);
@@ -1615,8 +1621,7 @@ export default function DesafioPokemonApp() {
             )}
           </section>
         )}
-
-        {/* INICIO */}
+         {/* INICIO */}
         {seccionActual === 'INICIO' && (
           <div className="w-full max-w-5xl flex flex-col gap-6">
             <div className="bg-white/10 backdrop-blur-md p-4 rounded-3xl border border-white/10 flex items-center justify-between">
@@ -1981,7 +1986,7 @@ export default function DesafioPokemonApp() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* GESTOR DE MONEDAS */}
-              <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 flex flex-col gap-4">
+              <div className="bg-slate-950 p-5 rounded-2xl border borde-slate-800 flex flex-col gap-4">
                 <h3 className="text-sm font-bold">🪙 Gestor de Monedas</h3>
                 <label className="text-xs text-slate-400">Jugador</label>
                 <select
@@ -2312,8 +2317,7 @@ export default function DesafioPokemonApp() {
             </div>
           </div>
         )}
-
-        {/* NOTIFICACIÓN */}
+         {/* NOTIFICACIÓN */}
         {notificacion.visible && (
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-emerald-500 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center justify-between gap-8 border border-emerald-400 z-[100] min-w-[320px]">
             <div className="flex flex-col">
@@ -2338,7 +2342,3 @@ export default function DesafioPokemonApp() {
     </div>
   );
 }
-                                                                                 
-                                                   
-                    
-                                                
